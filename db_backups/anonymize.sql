@@ -16,6 +16,3 @@ DELETE FROM mailer_messagelog;
 -- Make sure everyone has the same simple password, in this case, 'pass'
 -- See here: https://docs.djangoproject.com/en/2.0/topics/auth/passwords/
 UPDATE auth_user SET password='pbkdf2_sha256$36000$Z6GlerjZ9cWC$M6zn6XGPc81913R1yw6SMouredUfO/DPnQwZ3XxUCnA=';
-
--- Anonymize grade/poll answers
-DELETE FROM poll_submission;
