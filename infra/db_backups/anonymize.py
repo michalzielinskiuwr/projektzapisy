@@ -35,10 +35,14 @@ def anonymize_poll(conn):
     for row in polls:
         cur.execute("update poll_submission set answers = %s where id = %s",
 <<<<<<< HEAD:infra/db_backups/anonymize.py
+<<<<<<< HEAD:infra/db_backups/anonymize.py
                     (jsons_dict[row[1]], row[0]))
 =======
             (jsons_dict[row[1]], row[0]))
 >>>>>>> Poprawki długości linii:db_backups/anonymize.py
+=======
+                    (jsons_dict[row[1]], row[0]))
+>>>>>>> poprawa anonimizacji:db_backups/anonymize.py
     cur.close()
     conn.commit()
 
@@ -51,8 +55,13 @@ def connect_and_anonymize():
         sys.exit(1)
 >>>>>>> Poprawki długości linii:db_backups/anonymize.py
     try:
+<<<<<<< HEAD:infra/db_backups/anonymize.py
         conn = psycopg2.connect(dbname=db_name, user=user,
                                 password=password, host="localhost", port=port)
+=======
+        conn = psycopg2.connect(dbname=sys.argv[3], user=sys.argv[1],
+                                password=sys.argv[2], host="localhost", port=sys.argv[4])
+>>>>>>> poprawa anonimizacji:db_backups/anonymize.py
         anonymize_poll(conn)
 <<<<<<< HEAD:infra/db_backups/anonymize.py
     except psycopg2.Error:
@@ -70,4 +79,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+<<<<<<< HEAD:infra/db_backups/anonymize.py
 >>>>>>> Poprawki długości linii:db_backups/anonymize.py
+=======
+>>>>>>> poprawa anonimizacji:db_backups/anonymize.py

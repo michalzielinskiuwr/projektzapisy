@@ -12,5 +12,9 @@ DELETE FROM mailer_messagelog;
 
 -- Make sure everyone has the same simple password, in this case, 'pass'
 -- See here: https://docs.djangoproject.com/en/2.0/topics/auth/passwords/
+<<<<<<< HEAD:infra/db_backups/anonymize.sql
 UPDATE auth_user SET 
 password='pbkdf2_sha256$36000$Z6GlerjZ9cWC$M6zn6XGPc81913R1yw6SMouredUfO/DPnQwZ3XxUCnA=';
+=======
+UPDATE auth_user SET password='pbkdf2_sha256$36000$Z6GlerjZ9cWC$M6zn6XGPc81913R1yw6SMouredUfO/DPnQwZ3XxUCnA=';
+>>>>>>> poprawa anonimizacji:db_backups/anonymize.sql
