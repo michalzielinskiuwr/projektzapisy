@@ -26,7 +26,7 @@ def anonymize_poll(conn):
     polls = cur.fetchall()
     for row in polls:
         cur.execute("update poll_submission set answers = %s where id = %s",
-            (jsons_dict[row[1]], row[0]))
+                    (jsons_dict[row[1]], row[0]))
     cur.close()
     conn.commit()
 
@@ -36,7 +36,7 @@ def connect_and_anonymize():
         sys.exit(1)
     try:
         conn = psycopg2.connect(dbname=sys.argv[3], user=sys.argv[1],
-            password=sys.argv[2], host="localhost", port=sys.argv[4])
+                                password=sys.argv[2], host="localhost", port=sys.argv[4])
         anonymize_poll(conn)
     except Exception as e:
         print(str(e))
