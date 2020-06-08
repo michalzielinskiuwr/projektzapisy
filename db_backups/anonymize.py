@@ -2,7 +2,7 @@ import psycopg2
 import json
 import sys
 
-# TODO exceptions
+
 def anonymize_poll(conn):
     cur = conn.cursor()
     # create answers from schemas
@@ -25,9 +25,11 @@ def anonymize_poll(conn):
     cur.execute(query)
     polls = cur.fetchall()
     for row in polls:
-        cur.execute("update poll_submission set answers = %s where id = %s", (jsons_dict[row[1]], row[0]))
+        cur.execute("update poll_submission set answers = %s where id = %s",
+            (jsons_dict[row[1]], row[0]))
     cur.close()
     conn.commit()
+
 
 def connect_and_anonymize():
     if len(sys.argv) < 5:
@@ -40,9 +42,11 @@ def connect_and_anonymize():
         print(str(e))
         sys.exit(1)
 
+
 def main():
     conn = connect_and_anonymize()
     sys.exit(0)
+
 
 if __name__ == '__main__':
     main()

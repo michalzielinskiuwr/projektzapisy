@@ -1,6 +1,3 @@
--- Nuke IBANs
-UPDATE users_studiazamawiane SET bank_account='';
-
 -- Anonymize first/last names
 UPDATE auth_user SET first_name=CONCAT(SUBSTRING(first_name, 1, 1), '_', id);
 UPDATE auth_user SET last_name=CONCAT(SUBSTRING(last_name, 1, 1), '_', id);
