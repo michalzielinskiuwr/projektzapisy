@@ -26,7 +26,6 @@ class SubmissionStats:
             if s.submitted:
                 self.submitted += 1
                 self.submitted_by_category[s.category] += 1
-                self
 
     @property
     def progress(self) -> str:
