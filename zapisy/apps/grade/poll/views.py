@@ -2,7 +2,7 @@ import itertools
 import json
 from collections import defaultdict
 from operator import attrgetter
-from typing import List
+from typing import Iterable, List
 
 from django.contrib import messages
 from django.shortcuts import redirect, render, reverse
@@ -183,7 +183,7 @@ class PollResults(TemplateView):
         return number_of_submissions_for_category
 
     @staticmethod
-    def __get_processed_results(submissions):
+    def __get_processed_results(submissions: Iterable[Submission]):
         poll_results = PollSummarizedResults(
             display_answers_count=True, display_plots=True
         )
@@ -198,6 +198,7 @@ class PollResults(TemplateView):
                         question=entry['question'],
                         field_type=entry['type'],
                         answer=entry['answer'],
+                        timestamp=submission.modified,
                         choices=choices,
                     )
 

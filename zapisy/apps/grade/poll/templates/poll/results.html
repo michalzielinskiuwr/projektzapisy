@@ -38,8 +38,11 @@
         {{ entry.plot.0 | safe }}
         {% else %}
         {% for answer in entry.answers %}
-        {% if answer %}
-        <div class="{% if not forloop.last %}border-bottom {% endif %}pb-2 pt-2">{{ answer }}</div>
+        {% if answer.contents %}
+        <div class="{% if not forloop.last %}border-bottom {% endif %}pb-2 pt-2">
+          <small class="text-muted float-right px-1">{{ answer.timestamp }}</small>
+          {{ answer.contents }}
+        </div>
         {% endif %}
         {% endfor %}
         {% endif %}

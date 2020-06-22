@@ -1,5 +1,6 @@
 from collections import defaultdict
-from typing import Dict, List
+from datetime import datetime
+from typing import Any, Dict, List, NamedTuple
 
 import bokeh.embed
 import bokeh.models.sources
@@ -99,6 +100,12 @@ def group(entries: List[Poll], sort=False) -> dict:
     return dict(output)
 
 
+class Answer(NamedTuple):
+    """Carries an answer to the single question in a Poll."""
+    contents: Any
+    timestamp: datetime
+
+
 class PollSummarizedResultsEntry:
     """A single entry in a summary view for a Poll.
 
@@ -107,7 +114,7 @@ class PollSummarizedResultsEntry:
     """
     def __init__(self, question, field_type, choices=None):
         self.question = question
-        self._answers = []
+        self._answers: List[Answer] = []
         self._choices = choices
         self._choices_occurences = [0] * len(choices) if choices else []
         self._components = None
@@ -122,7 +129,7 @@ class PollSummarizedResultsEntry:
             return self._choices
         return []
 
-    def add_answer(self, answer):
+    def add_answer(self, answer: Answer):
         """Adds an answer to the container.
 
         If the field_type of the entry is set to `radio`, the answer will be
@@ -130,20 +137,20 @@ class PollSummarizedResultsEntry:
         If the field_tyoe of the entry is set to `checkbox`, each answer will be
         counted separately.
         """
-        if not answer:
+        if not answer.contents:
             return
         if self.field_type == 'radio' and answer in self._choices:
-            choice_index = self._choices.index(answer)
+            choice_index = self._choices.index(answer.contents)
             self._choices_occurences[choice_index] += 1
         if self.field_type == 'checkbox':
             # Multiple-choice question will have a list of selected answers.
-            for a in answer:
+            for a in answer.contents:
                 choice_index = self._choices.index(a)
                 self._choices_occurences[choice_index] += 1
         self._answers.append(answer)
 
     @property
-    def answers(self):
+    def answers(self) -> List[Answer]:
         return self._answers
 
     @property
@@ -189,16 +196,16 @@ class PollSummarizedResults:
         self.display_answers_count = display_answers_count
         self.display_plots = display_plots
 
-    def add_entry(self, question, field_type, answer, choices=None):
+    def add_entry(self, question, field_type, answer, timestamp, choices=None):
         if question in self._questions:
             index = self._questions.index(question)
             existing_entry = self._entries[index]
-            existing_entry.add_answer(answer)
+            existing_entry.add_answer(Answer(contents=answer, timestamp=timestamp))
         else:
             new_entry = PollSummarizedResultsEntry(
                 question=question, field_type=field_type, choices=choices
             )
-            new_entry.add_answer(answer)
+            new_entry.add_answer(Answer(contents=answer, timestamp=timestamp))
             self._entries.append(new_entry)
             self._questions.append(question)
 
