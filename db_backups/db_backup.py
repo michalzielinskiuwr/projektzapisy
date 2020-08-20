@@ -6,8 +6,9 @@ import time
 from datetime import datetime, timedelta
 
 import anonymize
-from slack_notifications import connect_slack_client
-import dropbox_upload
+from slack_notifications import connect_slack_client, send_success_notification,
+send_error_notification
+from dropbox_upload import upload_dumps
 
 
 def get_secrets():
@@ -24,11 +25,11 @@ def get_filename(suff):
     return f'{path}.7z'
 
 
-def perform_dump():
+def perform_dump(secrets_env):
     prod_filename = get_filename('prod')
     dev_filename = get_filename('dev')
     # full dump - prod and dev
-    res = subprocess.run(["sh","backup.sh", prod_filename, dev_filename],
+    res = subprocess.run(["sh", "backup.sh", prod_filename, dev_filename],
                          stderr=subprocess.PIPE)
     if res.returncode != 0:
         error_str = res.stderr.decode('utf-8')
@@ -47,7 +48,7 @@ def main():
     try:
         start_time = datetime.now()
         # perform dump
-        dev_link = perform_dump()
+        dev_link = perform_dump(secrets_env)
         end_time = datetime.now()
         seconds_elapsed = (end_time - start_time).seconds
         # send slack message
@@ -57,7 +58,7 @@ def main():
         # send error slack massage
         err_description = traceback.format_exc()
         print("error: ", err_description)
-        send_error_notification(slack_client, err_description) 
+        send_error_notification(slack_client, err_description)
 
 
 if __name__ == '__main__':

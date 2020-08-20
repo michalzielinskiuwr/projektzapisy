@@ -1,9 +1,11 @@
 import dropbox
+import os
 from datetime import datetime, timedelta
 
 DROPBOX_DEV_DUMPS_DIRNAME = '/dev_dumps'
 DROPBOX_PROD_DUMPS_DIRNAME = '/prod_dumps'
 DUMPS_THRESHOLD = timedelta(weeks=-4)
+
 
 def upload_dumps(dropbox_token, prod_file, dev_file):
     dbx = dropbox.Dropbox(dropbox_token)
@@ -14,20 +16,21 @@ def upload_dumps(dropbox_token, prod_file, dev_file):
     return dbx.sharing_create_shared_link(dev_dbx_path)
 
 def check_directories(dbx):
-# exception: gdy pliki nie istenieja
     dbx.files_get_metadata(DROPBOX_PROD_DUMPS_DIRNAME)
     dbx.files_get_metadata(DROPBOX_DEV_DUMPS_DIRNAME)
 
+
 def remove_old_files(dbx):
     oldest_allowed_modtime = datetime.now() + DUMPS_THRESHOLD
-    remove_older_dumps(dbx, DROPBOX_PROD_DUMPS_DIRNAME, oldest_allowed_modtime)
-    remove_older_dumps(dbx, DROPBOX_DEV_DUMPS_DIRNAME, oldest_allowed_modtime)
+    remove_files_older_than_date(dbx, DROPBOX_PROD_DUMPS_DIRNAME, oldest_allowed_modtime)
+    remove_files_older_than_date(dbx, DROPBOX_DEV_DUMPS_DIRNAME, oldest_allowed_modtime)
+
 
 def remove_files_older_than_date(dbx, folder_path, threshold_dt):
     file_list = dbx.files_list_folder(folder_path)
     for file in file_list.entries:
         if file.client_modified < threshold_dt:
-            dbx.files_delete(file_entry.path_lower)
+            dbx.files_delete(file.path_lower)
 
 
 def upload_file(dbx, file_path, folder_path):
