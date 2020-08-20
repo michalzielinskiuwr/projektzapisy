@@ -6,8 +6,8 @@ import time
 from datetime import datetime, timedelta
 
 import anonymize
-from slack_notifications import connect_slack_client, send_success_notification,
-send_error_notification
+from slack_notifications import connect_slack_client, send_success_notification, \
+    send_error_notification
 from dropbox_upload import upload_dumps
 
 
@@ -52,12 +52,10 @@ def main():
         end_time = datetime.now()
         seconds_elapsed = (end_time - start_time).seconds
         # send slack message
-        print("poprawnie zakończony dump ", seconds_elapsed)
         send_success_notification(slack_client, dev_link.url, seconds_elapsed)
     except Exception:
         # send error slack massage
         err_description = traceback.format_exc()
-        print("error: ", err_description)
         send_error_notification(slack_client, err_description)
 
 

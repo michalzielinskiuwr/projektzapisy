@@ -15,6 +15,7 @@ def upload_dumps(dropbox_token, prod_file, dev_file):
     dev_dbx_path = upload_file(dbx, dev_file, DROPBOX_DEV_DUMPS_DIRNAME)
     return dbx.sharing_create_shared_link(dev_dbx_path)
 
+
 def check_directories(dbx):
     dbx.files_get_metadata(DROPBOX_PROD_DUMPS_DIRNAME)
     dbx.files_get_metadata(DROPBOX_DEV_DUMPS_DIRNAME)
