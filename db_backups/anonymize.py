@@ -2,6 +2,7 @@ import psycopg2
 import argparse
 import json
 import sys
+from loremipsum import generate_paragraph
 
 
 def anonymize_poll(conn):
@@ -15,7 +16,7 @@ def anonymize_poll(conn):
         json_src = row[1]
         for field in json_src['schema']:
             if field['type'] == 'textarea':
-                field['answer'] = 'ans'
+                field['answer'] = generate_paragraph()[2]
             elif field['type'] == 'radio':
                 field['answer'] = field['choices'][0]
             json_dest = json.dumps(json_src)
