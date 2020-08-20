@@ -1,27 +1,26 @@
-#!/usr/bin/env python3
-from slackclient import SlackClient
+from slack import WebClient
 
-
-def get_connected_slack_client(secrets_env):
-    slack_client = SlackClient(secrets_env.str('SLACK_TOKEN'))
+def connect_slack_client(slack_token):
+    slack_client = WebClient(slack_token)
     if slack_client.rtm_connect(with_team_state=False):
         return slack_client
     raise RuntimeError('SlackClient.rtm_connect failed')
 
 
-def _send_slack_msg(slack_client, msg: str):
+def send_slack_msg(slack_client, chan, msg: str):
     slack_client.api_call(
         'chat.postMessage',
-        channel='db_backups',
+        channel=chan,
         text=msg
     )
 
 
 def send_success_notification(slack_client, dev_db_link: str, seconds_elapsed: int):
     msg = f'Databases backed up successfully in {seconds_elapsed} seconds. *Dev DB download link:* {dev_db_link}'
-    _send_slack_msg(slack_client, msg)
+    send_slack_msg(slack_client, 'db_backups', msg)
+
 
 
 def send_error_notification(slack_client, error_msg: str):
     msg = f'*Failed to back up databases:*\n```{error_msg}```'
-    _send_slack_msg(slack_client, msg)
+    send_slack_msg(slack_client, 'bugs', msg)

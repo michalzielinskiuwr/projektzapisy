@@ -1,4 +1,5 @@
 import psycopg2
+import argparse
 import json
 import sys
 
@@ -31,20 +32,29 @@ def anonymize_poll(conn):
     conn.commit()
 
 
-def connect_and_anonymize():
-    if len(sys.argv) < 5:
-        sys.exit(1)
+def connect_and_anonymize(args):
     try:
-        conn = psycopg2.connect(dbname=sys.argv[3], user=sys.argv[1],
-                                password=sys.argv[2], host="localhost", port=sys.argv[4])
+        conn = psycopg2.connect(dbname=args.database_name, user=args.user,
+                                password=args.password, host="localhost", port=args.port)
+
         anonymize_poll(conn)
     except Exception as e:
         print(str(e))
         sys.exit(1)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-u', '--user', required=True)
+    parser.add_argument('-ps', '--password', required=True)
+    parser.add_argument('-db', '--database_name', required=True)
+    parser.add_argument('-p', '--port', required=True)
+    return parser.parse_args()
+
+
 def main():
-    conn = connect_and_anonymize()
+    args = parse_args()
+    conn = connect_and_anonymize(args)
     sys.exit(0)
 
 

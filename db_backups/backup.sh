@@ -1,11 +1,11 @@
 
 # exit when returns non-zero
-#set -e
+set -e
 
-OUTFILE_PATH_DEV="$1"
-OUTFILE_PATH_PROD="$2"
-TEMP_DUMP_PATH_DEV='/tmp/ii_zapisy_dump_dev.sql'
+OUTFILE_PATH_PROD="$1"
+OUTFILE_PATH_DEV="$2"
 TEMP_DUMP_PATH_PROD='/tmp/ii_zapisy_dump_prod.sql'
+TEMP_DUMP_PATH_DEV='/tmp/ii_zapisy_dump_dev.sql'
 TEMP_DB_NAME='II_ZAPISY_BACKUP_TEMP_DB'
 
 
@@ -32,10 +32,10 @@ read_variables
 [ -z "${DATABASE_PORT}" ] && echo "Secret variable is missing" && exit 1;
 [ -z "${DATABASE_DUMP_PASSWORD}" ] && echo "Secret variable is missing" && exit 1;
 
-# TODO install 7za
-if ! type "7za" &> /dev/null; then
-	echo "p7zip-full is required."
-	exit 2
+# check if 7za is installed
+if ! [ -x "$(command -v 7za)" ]; then
+  echo "p7zip-full is requiredddd." >&2
+  exit 2
 fi
 
 # save prod database to temp file
@@ -50,19 +50,12 @@ PGPASSWORD="${DATABASE_PASSWORD}" psql -U "${DATABASE_USER}" -h localhost \
 -p "${DATABASE_PORT}" -d "$TEMP_DB_NAME" < "$TEMP_DUMP_PATH_PROD"
 
 # anonymize elements:
-# students' data, passwords
+#   students' data, passwords
 PGPASSWORD="${DATABASE_PASSWORD}" psql -U "${DATABASE_USER}" -h localhost \
 -p "${DATABASE_PORT}" -f anonymize.sql "$TEMP_DB_NAME" 
-# poll - TODO install psycopg2
-python anonymize.py "${DATABASE_USER}" "${DATABASE_PASSWORD}" "$TEMP_DB_NAME" \
-"${DATABASE_PORT}"
-
-# poll anonymization error
-if [ $? != 0 ]; then
-	echo "poll submission anonymization error - delete from poll_submission"
-    PGPASSWORD="${DATABASE_PASSWORD}" psql -U "${DATABASE_USER}" -h localhost \
-    -p "${DATABASE_PORT}" -d "$TEMP_DB_NAME" -c "DELETE FROM poll_submission;"
-fi
+#   poll - TODO install psycopg2
+python anonymize.py -u "${DATABASE_USER}" -ps "${DATABASE_PASSWORD}" -db "$TEMP_DB_NAME" \
+-p "${DATABASE_PORT}"
 
 # save dev database to temp file
 PGPASSWORD="${DATABASE_PASSWORD}" pg_dump \
