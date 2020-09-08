@@ -100,9 +100,12 @@ def perform_dump(secrets_env):
     DATABASE_PASSWORD = secrets_env.str('DATABASE_PASSWORD')
 
 <<<<<<< HEAD:infra/db_backups/db_backup.py
+<<<<<<< HEAD:infra/db_backups/db_backup.py
 =======
     # save prod database to temp file
 >>>>>>> poprawki kodu:db_backups/db_backup.py
+=======
+>>>>>>> Dodanie docstringów do funkcji:db_backups/db_backup.py
     run_pg_dump(DATABASE_USER, DATABASE_PORT, DATABASE_NAME, DATABASE_PASSWORD,
                 temp_prod_filename)
     run_psql_command(f'DROP DATABASE IF EXISTS {TEMP_DB_NAME}')
@@ -129,7 +132,11 @@ def perform_dump(secrets_env):
 
 
 def main():
+<<<<<<< HEAD:infra/db_backups/db_backup.py
     """Performs database backup and sends notification with result to Slack."""
+=======
+    """Performs database backup and sends noification with result to Slack."""
+>>>>>>> Dodanie docstringów do funkcji:db_backups/db_backup.py
     secrets_env = get_secrets()
     slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:

@@ -24,13 +24,19 @@ def upload_dumps(dropbox_token, prod_file, dev_file):
 def check_directories(dbx):
 <<<<<<< HEAD:infra/db_backups/dropbox_upload.py
 <<<<<<< HEAD:infra/db_backups/dropbox_upload.py
+<<<<<<< HEAD:infra/db_backups/dropbox_upload.py
+=======
+>>>>>>> Dodanie docstringów do funkcji:db_backups/dropbox_upload.py
     """Checks if required directories exist.
 
     Raises:
         dropbox.exceptions.ApiError: Directories don't exist.
     """
+<<<<<<< HEAD:infra/db_backups/dropbox_upload.py
 =======
 >>>>>>> Usunięcie skryptu w bashu:db_backups/dropbox_upload.py
+=======
+>>>>>>> Dodanie docstringów do funkcji:db_backups/dropbox_upload.py
     try:
         dbx.files_get_metadata(DROPBOX_PROD_DUMPS_DIRNAME)
         dbx.files_get_metadata(DROPBOX_DEV_DUMPS_DIRNAME)
