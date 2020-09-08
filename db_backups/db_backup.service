@@ -2,9 +2,9 @@
 Description=Run database backup
 
 [Service]
-User=vagrant
-Group=vagrant
-WorkingDirectory=/vagrant/db_backups/
-ExecStart=/home/vagrant/env3/bin/python3 db_backup.py
+User={{ deploy_user }}
+Group={{ deploy_user }}
+WorkingDirectory=/home/{{ deploy_user }}/db_backups/
+ExecStart=/home/{{ deploy_user }}/env3/bin/python3 db_backup.py
 Type=simple
 

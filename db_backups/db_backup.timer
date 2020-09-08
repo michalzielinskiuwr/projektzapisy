@@ -6,6 +6,5 @@ OnCalendar=daily
 Persistent=true
 
 [Install]
-WantedBy=vagrant.mount
-
+WantedBy=multi-user.target
 

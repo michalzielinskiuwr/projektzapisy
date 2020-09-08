@@ -17,8 +17,11 @@ def upload_dumps(dropbox_token, prod_file, dev_file):
 
 
 def check_directories(dbx):
-    dbx.files_get_metadata(DROPBOX_PROD_DUMPS_DIRNAME)
-    dbx.files_get_metadata(DROPBOX_DEV_DUMPS_DIRNAME)
+    try:
+        dbx.files_get_metadata(DROPBOX_PROD_DUMPS_DIRNAME)
+        dbx.files_get_metadata(DROPBOX_DEV_DUMPS_DIRNAME)
+    except dropbox.exceptions.ApiError:
+        raise
 
 
 def remove_old_files(dbx):

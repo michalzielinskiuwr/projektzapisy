@@ -1,7 +1,5 @@
 import psycopg2
-import argparse
 import json
-import sys
 from loremipsum import generate_paragraph
 
 
@@ -23,7 +21,6 @@ def anonymize_poll(conn):
             jsons_dict[row[0]] = json_dest
     # insert answers to sumbissions based on schema type
     query = "select SUB.id, SUB.schema_id from poll_submission SUB"
-    # to add to query (?) where submitted = 't'
     cur.execute(query)
     polls = cur.fetchall()
     for row in polls:
@@ -33,31 +30,10 @@ def anonymize_poll(conn):
     conn.commit()
 
 
-def connect_and_anonymize(args):
+def connect_and_anonymize(user, password, db_name, port):
     try:
-        conn = psycopg2.connect(dbname=args.database_name, user=args.user,
-                                password=args.password, host="localhost", port=args.port)
-
+        conn = psycopg2.connect(dbname=db_name, user=user,
+                                password=password, host="localhost", port=port)
         anonymize_poll(conn)
-    except Exception as e:
-        print(str(e))
-        sys.exit(1)
-
-
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-u', '--user', required=True)
-    parser.add_argument('-ps', '--password', required=True)
-    parser.add_argument('-db', '--database_name', required=True)
-    parser.add_argument('-p', '--port', required=True)
-    return parser.parse_args()
-
-
-def main():
-    args = parse_args()
-    conn = connect_and_anonymize(args)
-    sys.exit(0)
-
-
-if __name__ == '__main__':
-    main()
+    except psycopg2.Error:
+        raise

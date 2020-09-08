@@ -4,11 +4,15 @@ import environ
 import traceback
 import time
 from datetime import datetime, timedelta
+import bz2
 
 import anonymize
 from slack_notifications import connect_slack_client, send_success_notification, \
     send_error_notification
 from dropbox_upload import upload_dumps
+
+
+TEMP_DB_NAME="ii_zapisy_db_dump"
 
 
 def get_secrets():
@@ -21,21 +25,75 @@ def get_secrets():
 
 def get_filename(suff):
     time_now_str = time.strftime('%Y_%m_%d__%H_%M_%S')
-    path = f'/tmp/ii_zapisy_db_dump_{time_now_str}_{suff}'
-    return f'{path}.7z'
+    path = f'/tmp/ii_zapisy_db_dump_{time_now_str}_{suff}.bz2'
+    return path
+
+
+def get_temp_filename(suff):
+    return f'/tmp/ii_zapisy_db_dump_{suff}.sql'
+
+
+def run_psql_command(comm):
+    res = subprocess.run(['sudo', '-su', 'postgres', 'psql', '-c', comm])
+    if res.returncode != 0:
+        print(res)
+        raise subprocess.CalledProcessError
+
+
+def run_script_command(db_user, db_port, db_name, db_password, input_file):
+    res = subprocess.run(['psql', '-U', db_user, '-h', 'localhost', '-p', db_port, 
+        '-f', input_file, db_name], env={'PGPASSWORD': db_password})
+    if res.returncode != 0:
+        print(res)
+        raise subprocess.CalledProcessError
+
+
+def run_pg_dump(db_user, db_port, db_name, db_password, output_file):
+    res = subprocess.run(['pg_dump', '-U', db_user, '-h', 'localhost', '-p', db_port,
+        '-f', output_file, db_name], env={'PGPASSWORD': db_password})
+    if res.returncode != 0:
+        print(res)
+        raise subprocess.CalledProcessError
+
+
+def compress_file(inp, output):
+    bz2file = bz2.open(output, "wb")
+    source = open(inp, 'rb')
+    bz2file.write(source.read())
+    bz2file.close()
 
 
 def perform_dump(secrets_env):
     prod_filename = get_filename('prod')
     dev_filename = get_filename('dev')
-    # full dump - prod and dev
-    res = subprocess.run(["sh", "backup.sh", prod_filename, dev_filename],
-                         stderr=subprocess.PIPE)
-    if res.returncode != 0:
-        error_str = res.stderr.decode('utf-8')
-        raise RuntimeError(
-            f'backup.sh failed with error code {res.returncode}: {error_str}'
-        )
+    temp_prod_filename = get_temp_filename('prod')
+    temp_dev_filename = get_temp_filename('dev')
+
+    DATABASE_USER = secrets_env.str('DATABASE_USER')
+    DATABASE_PORT = secrets_env.str('DATABASE_PORT')
+    DATABASE_NAME = secrets_env.str('DATABASE_NAME')
+    DATABASE_PASSWORD = secrets_env.str('DATABASE_PASSWORD')
+    
+    # save prod database to temp file
+    run_pg_dump(DATABASE_USER, DATABASE_PORT, DATABASE_NAME, DATABASE_PASSWORD,
+                temp_prod_filename)
+    run_psql_command(f'DROP DATABASE IF EXISTS {TEMP_DB_NAME}')
+    run_psql_command(f'CREATE DATABASE {TEMP_DB_NAME}')
+    run_script_command(DATABASE_USER, DATABASE_PORT, TEMP_DB_NAME, DATABASE_PASSWORD,
+                       temp_prod_filename)
+    run_script_command(DATABASE_USER, DATABASE_PORT, TEMP_DB_NAME, DATABASE_PASSWORD,
+                       'anonymize.sql')
+    anonymize.connect_and_anonymize(DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME,
+                                    DATABASE_PORT)
+    run_pg_dump(DATABASE_USER, DATABASE_PORT, TEMP_DB_NAME, DATABASE_PASSWORD,
+                temp_dev_filename)
+    run_psql_command(f'DROP DATABASE {TEMP_DB_NAME}')
+    
+    compress_file(temp_prod_filename, prod_filename)
+    os.remove(temp_prod_filename)
+    compress_file(temp_dev_filename, dev_filename)
+    os.remove(temp_dev_filename)
+
     # send to dropbox
     dev_link = upload_dumps(secrets_env.str('DROPBOX_OAUTH2_TOKEN'), prod_filename,
                             dev_filename)
@@ -44,7 +102,7 @@ def perform_dump(secrets_env):
 
 def main():
     secrets_env = get_secrets()
-    slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
+    #slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:
         start_time = datetime.now()
         # perform dump
