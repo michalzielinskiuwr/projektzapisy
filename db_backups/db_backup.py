@@ -12,7 +12,7 @@ from slack_notifications import connect_slack_client, send_success_notification,
 from dropbox_upload import upload_dumps
 
 
-TEMP_DB_NAME="ii_zapisy_db_dump"
+TEMP_DB_NAME = "ii_zapisy_db_dump"
 
 
 def get_secrets():
@@ -41,8 +41,8 @@ def run_psql_command(comm):
 
 
 def run_script_command(db_user, db_port, db_name, db_password, input_file):
-    res = subprocess.run(['psql', '-U', db_user, '-h', 'localhost', '-p', db_port, 
-        '-f', input_file, db_name], env={'PGPASSWORD': db_password})
+    res = subprocess.run(['psql', '-U', db_user, '-h', 'localhost', '-p', db_port,
+                          '-f', input_file, db_name], env={'PGPASSWORD': db_password})
     if res.returncode != 0:
         print(res)
         raise subprocess.CalledProcessError
@@ -50,7 +50,7 @@ def run_script_command(db_user, db_port, db_name, db_password, input_file):
 
 def run_pg_dump(db_user, db_port, db_name, db_password, output_file):
     res = subprocess.run(['pg_dump', '-U', db_user, '-h', 'localhost', '-p', db_port,
-        '-f', output_file, db_name], env={'PGPASSWORD': db_password})
+                          '-f', output_file, db_name], env={'PGPASSWORD': db_password})
     if res.returncode != 0:
         print(res)
         raise subprocess.CalledProcessError
@@ -73,7 +73,7 @@ def perform_dump(secrets_env):
     DATABASE_PORT = secrets_env.str('DATABASE_PORT')
     DATABASE_NAME = secrets_env.str('DATABASE_NAME')
     DATABASE_PASSWORD = secrets_env.str('DATABASE_PASSWORD')
-    
+
     # save prod database to temp file
     run_pg_dump(DATABASE_USER, DATABASE_PORT, DATABASE_NAME, DATABASE_PASSWORD,
                 temp_prod_filename)
@@ -88,7 +88,7 @@ def perform_dump(secrets_env):
     run_pg_dump(DATABASE_USER, DATABASE_PORT, TEMP_DB_NAME, DATABASE_PASSWORD,
                 temp_dev_filename)
     run_psql_command(f'DROP DATABASE {TEMP_DB_NAME}')
-    
+
     compress_file(temp_prod_filename, prod_filename)
     os.remove(temp_prod_filename)
     compress_file(temp_dev_filename, dev_filename)
@@ -102,7 +102,7 @@ def perform_dump(secrets_env):
 
 def main():
     secrets_env = get_secrets()
-    #slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
+    slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:
         start_time = datetime.now()
         # perform dump
