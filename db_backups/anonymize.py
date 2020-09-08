@@ -4,6 +4,11 @@ from loremipsum import generate_paragraph
 
 
 def anonymize_poll(conn):
+    """Performs anonymization of poll submissions.
+
+    Function creates default answers from poll schemas and inserts
+    them into proper poll submission entries.
+    """
     cur = conn.cursor()
     # create answers from schemas
     query = "select PS.id, PS.questions from poll_schema PS"

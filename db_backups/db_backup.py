@@ -16,6 +16,7 @@ TEMP_DB_NAME = "ii_zapisy_db_dump"
 
 
 def get_secrets():
+    """Returns environment with data required to open database."""
     env = environ.Env()
     secrets_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                      os.pardir, 'env', '.env')
@@ -64,6 +65,15 @@ def compress_file(inp, output):
 
 
 def perform_dump(secrets_env):
+    """Performs production's and developers' database backup.
+
+    Dev backup is created from prod backup after anonymization is performed
+    on temporary copy of main database. After compression both files are
+    uploaded to dropbox.
+
+    Returns:
+        Link to dropbox to developers' database
+    """
     prod_filename = get_filename('prod')
     dev_filename = get_filename('dev')
     temp_prod_filename = get_temp_filename('prod')
@@ -74,7 +84,6 @@ def perform_dump(secrets_env):
     DATABASE_NAME = secrets_env.str('DATABASE_NAME')
     DATABASE_PASSWORD = secrets_env.str('DATABASE_PASSWORD')
 
-    # save prod database to temp file
     run_pg_dump(DATABASE_USER, DATABASE_PORT, DATABASE_NAME, DATABASE_PASSWORD,
                 temp_prod_filename)
     run_psql_command(f'DROP DATABASE IF EXISTS {TEMP_DB_NAME}')
@@ -101,6 +110,7 @@ def perform_dump(secrets_env):
 
 
 def main():
+    """Performs database backup and sends noification with result to Slack."""
     secrets_env = get_secrets()
     slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:

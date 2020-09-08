@@ -17,6 +17,11 @@ def upload_dumps(dropbox_token, prod_file, dev_file):
 
 
 def check_directories(dbx):
+    """Checks if required directories exist.
+
+    Raises:
+        dropbox.exceptions.ApiError: Directories don't exist.
+    """
     try:
         dbx.files_get_metadata(DROPBOX_PROD_DUMPS_DIRNAME)
         dbx.files_get_metadata(DROPBOX_DEV_DUMPS_DIRNAME)
@@ -25,6 +30,7 @@ def check_directories(dbx):
 
 
 def remove_old_files(dbx):
+    """Removes files older than set threshold."""
     oldest_allowed_modtime = datetime.now() + DUMPS_THRESHOLD
     remove_files_older_than_date(dbx, DROPBOX_PROD_DUMPS_DIRNAME, oldest_allowed_modtime)
     remove_files_older_than_date(dbx, DROPBOX_DEV_DUMPS_DIRNAME, oldest_allowed_modtime)
