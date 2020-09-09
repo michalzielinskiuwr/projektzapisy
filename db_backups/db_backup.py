@@ -110,7 +110,7 @@ def perform_dump(secrets_env):
 
 
 def main():
-    """Performs database backup and sends noification with result to Slack."""
+    """Performs database backup and sends notification with result to Slack."""
     secrets_env = get_secrets()
     slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:
