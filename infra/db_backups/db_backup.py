@@ -133,10 +133,14 @@ def perform_dump(secrets_env):
 
 def main():
 <<<<<<< HEAD:infra/db_backups/db_backup.py
+<<<<<<< HEAD:infra/db_backups/db_backup.py
     """Performs database backup and sends notification with result to Slack."""
 =======
     """Performs database backup and sends noification with result to Slack."""
 >>>>>>> Dodanie docstringów do funkcji:db_backups/db_backup.py
+=======
+    """Performs database backup and sends notification with result to Slack."""
+>>>>>>> Poprawa literówki:db_backups/db_backup.py
     secrets_env = get_secrets()
     slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:
