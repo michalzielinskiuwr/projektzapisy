@@ -1,7 +1,10 @@
 <<<<<<< HEAD:infra/db_backups/dropbox_upload.py
+<<<<<<< HEAD:infra/db_backups/dropbox_upload.py
 =======
 import dropbox
 >>>>>>> zmiana backupu bazy danych:db_backups/dropbox_upload.py
+=======
+>>>>>>> Poprawki w sekcjach import:db_backups/dropbox_upload.py
 import os
 from datetime import datetime, timedelta
 

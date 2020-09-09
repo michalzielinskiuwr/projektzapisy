@@ -1,6 +1,9 @@
 import json
 
 <<<<<<< HEAD:infra/db_backups/anonymize.py
+<<<<<<< HEAD:infra/db_backups/anonymize.py
+=======
+>>>>>>> Poprawki w sekcjach import:db_backups/anonymize.py
 import psycopg2
 from loremipsum import generate_paragraph
 
