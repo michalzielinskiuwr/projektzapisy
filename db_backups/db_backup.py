@@ -1,11 +1,11 @@
 import subprocess
 import os
-import environ
 import traceback
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import bz2
 
+import environ
 import anonymize
 from slack_notifications import connect_slack_client, send_success_notification, \
     send_error_notification

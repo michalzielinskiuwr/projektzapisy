@@ -1,5 +1,6 @@
-import psycopg2
 import json
+
+import psycopg2
 from loremipsum import generate_paragraph
 
 
