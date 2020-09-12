@@ -36,25 +36,28 @@ def get_temp_filename(suff):
 
 def run_psql_command(comm):
     res = subprocess.run(['sudo', '-su', 'postgres', 'psql', '-c', comm])
-    if res.returncode != 0:
-        print(res)
-        raise subprocess.CalledProcessError
+    try:
+        res.check_returncode()
+    except subprocess.CalledProcessError:
+        raise
 
 
 def run_script_command(db_user, db_port, db_name, db_password, input_file):
     res = subprocess.run(['psql', '-U', db_user, '-h', 'localhost', '-p', db_port,
                           '-f', input_file, db_name], env={'PGPASSWORD': db_password})
-    if res.returncode != 0:
-        print(res)
-        raise subprocess.CalledProcessError
+    try:
+        res.check_returncode()
+    except subprocess.CalledProcessError:
+        raise
 
 
 def run_pg_dump(db_user, db_port, db_name, db_password, output_file):
     res = subprocess.run(['pg_dump', '-U', db_user, '-h', 'localhost', '-p', db_port,
                           '-f', output_file, db_name], env={'PGPASSWORD': db_password})
-    if res.returncode != 0:
-        print(res)
-        raise subprocess.CalledProcessError
+    try:
+        res.check_returncode()
+    except subprocess.CalledProcessError:
+        raise
 
 
 def compress_file(inp, output):
