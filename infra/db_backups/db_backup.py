@@ -36,40 +36,25 @@ def get_temp_filename(suff):
 
 def run_psql_command(comm):
     res = subprocess.run(['sudo', '-su', 'postgres', 'psql', '-c', comm])
-    try:
-        res.check_returncode()
-    except subprocess.CalledProcessError:
-        raise
+    if res.returncode != 0:
+        print(res)
+        raise subprocess.CalledProcessError
 
 
 def run_script_command(db_user, db_port, db_name, db_password, input_file):
     res = subprocess.run(['psql', '-U', db_user, '-h', 'localhost', '-p', db_port,
                           '-f', input_file, db_name], env={'PGPASSWORD': db_password})
-<<<<<<< HEAD:infra/db_backups/db_backup.py
-    try:
-        res.check_returncode()
-    except subprocess.CalledProcessError:
-        raise
-=======
     if res.returncode != 0:
         print(res)
         raise subprocess.CalledProcessError
->>>>>>> poprawki kodu:db_backups/db_backup.py
 
 
 def run_pg_dump(db_user, db_port, db_name, db_password, output_file):
     res = subprocess.run(['pg_dump', '-U', db_user, '-h', 'localhost', '-p', db_port,
                           '-f', output_file, db_name], env={'PGPASSWORD': db_password})
-<<<<<<< HEAD:infra/db_backups/db_backup.py
-    try:
-        res.check_returncode()
-    except subprocess.CalledProcessError:
-        raise
-=======
     if res.returncode != 0:
         print(res)
         raise subprocess.CalledProcessError
->>>>>>> poprawki kodu:db_backups/db_backup.py
 
 
 def compress_file(inp, output):
@@ -99,13 +84,6 @@ def perform_dump(secrets_env):
     DATABASE_NAME = secrets_env.str('DATABASE_NAME')
     DATABASE_PASSWORD = secrets_env.str('DATABASE_PASSWORD')
 
-<<<<<<< HEAD:infra/db_backups/db_backup.py
-<<<<<<< HEAD:infra/db_backups/db_backup.py
-=======
-    # save prod database to temp file
->>>>>>> poprawki kodu:db_backups/db_backup.py
-=======
->>>>>>> Dodanie docstringów do funkcji:db_backups/db_backup.py
     run_pg_dump(DATABASE_USER, DATABASE_PORT, DATABASE_NAME, DATABASE_PASSWORD,
                 temp_prod_filename)
     run_psql_command(f'DROP DATABASE IF EXISTS {TEMP_DB_NAME}')
@@ -132,15 +110,7 @@ def perform_dump(secrets_env):
 
 
 def main():
-<<<<<<< HEAD:infra/db_backups/db_backup.py
-<<<<<<< HEAD:infra/db_backups/db_backup.py
     """Performs database backup and sends notification with result to Slack."""
-=======
-    """Performs database backup and sends noification with result to Slack."""
->>>>>>> Dodanie docstringów do funkcji:db_backups/db_backup.py
-=======
-    """Performs database backup and sends notification with result to Slack."""
->>>>>>> Poprawa literówki:db_backups/db_backup.py
     secrets_env = get_secrets()
     slack_client = connect_slack_client(secrets_env.str('SLACK_TOKEN'))
     try:
