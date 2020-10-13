@@ -293,7 +293,7 @@ def calendar_export(request):
     """Exports user's timetable for import in Google Calendar."""
     semester = Semester.get_upcoming_semester()
     groups = Group.objects.filter(course__semester=semester).filter(
-        Q(teacher__user=request.user) | Q(record__student__user=request.user))
+        Q(teacher__user=request.user) | Q(record__student__user=request.user, record__status=RecordStatus.ENROLLED))
     terms = SchTerm.objects.filter(event__group__in=groups).select_related(
         'event__group', 'event__group__course', 'event__group__teacher',
         'event__group__teacher__user', 'room')
@@ -305,10 +305,13 @@ def calendar_export(request):
         ['Subject', 'Start Date', 'Start Time', 'End Date', 'End Time', 'Location', 'Description'])
     for term in terms:
         group = term.event.group
-        room = term.room
+        if not term.room:
+            classroom = "Zajęcia zdalne"
+        else:
+            classroom = f"Sala {term.room}"
 
         name = f"{group.course.name} - {group.get_type_display()}"
-        location = f"Sala {room.number}, Instytut Informatyki Uniwersytetu Wrocławskiego"
+        location = f"{classroom}, Instytut Informatyki Uniwersytetu Wrocławskiego"
         description = f"Prowadzący: {group.get_teacher_full_name()}"
         writer.writerow([name, term.day, term.start, term.day, term.end, location, description])
     return response

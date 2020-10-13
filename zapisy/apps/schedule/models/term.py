@@ -231,8 +231,7 @@ def delete_course_terms(**kwargs):
     matching_terms = Term.objects.filter(event__group=instance.group,
                                          day__in=dates,
                                          start=instance.start_time,
-                                         end=instance.end_time,
-                                         room__in=instance.classrooms.all())
+                                         end=instance.end_time)
     matching_terms.delete()
 
 
@@ -254,9 +253,16 @@ def create_course_terms(**kwargs):
                                            status=Event.STATUS_ACCEPTED,
                                            author=instance.group.teacher.user)
     for day in dates:
-        for room in instance.classrooms.all():
+        rooms = instance.classrooms.all()
+        for room in rooms:
             Term.objects.create(event=event,
                                 day=day,
                                 start=instance.start_time,
                                 end=instance.end_time,
                                 room=room)
+        if not rooms:
+            Term.objects.create(event=event,
+                                day=day,
+                                start=instance.start_time,
+                                end=instance.end_time,
+                                room=None)
