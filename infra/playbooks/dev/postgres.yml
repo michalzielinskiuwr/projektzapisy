@@ -45,6 +45,10 @@
       become: yes
       when: service_status.stat.exists
 
+    - stat:
+        path: /vagrant/ii_zapisy_dump_dev.sql
+      register: dumpsql
+
     - name: Drop the database
       become: yes
       become_user: postgres
@@ -53,6 +57,7 @@
       postgresql_db:
         name: "{{ APP_DB_NAME }}"
         state: absent
+      when: dumpsql.stat.exists
 
     - name: Create the database
       become: yes
@@ -66,10 +71,6 @@
         lc_collate: pl_PL.UTF-8
         lc_ctype: pl_PL.UTF-8
         template: template0
-
-    - stat:
-        path: /vagrant/ii_zapisy_dump_dev.sql
-      register: dumpsql
 
     - name: Update the database
       become: yes
