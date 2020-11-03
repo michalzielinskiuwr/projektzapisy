@@ -40,7 +40,7 @@ class Semester(models.Model):
 
     is_grade_active = models.BooleanField(verbose_name='Ocena aktywna', default=False)
     records_ects_limit_abolition = models.DateTimeField(
-        null=True, verbose_name='Czas zniesienia limitu 35 ECTS')
+        null=True, blank=True, verbose_name='Czas zniesienia limitu 35 ECTS')
 
     t0_are_ready = models.BooleanField(verbose_name='T0 zostały ustalone', default=False)
 
@@ -100,9 +100,9 @@ class Semester(models.Model):
         if timestamp is None:
             timestamp = datetime.now()
         if self.records_ects_limit_abolition is not None:
-            if timestamp < self.records_ects_limit_abolition:
-                return settings.ECTS_INITIAL_LIMIT
-        return settings.ECTS_FINAL_LIMIT
+            if timestamp >= self.records_ects_limit_abolition:
+                return settings.ECTS_FINAL_LIMIT
+        return settings.ECTS_INITIAL_LIMIT
 
     def get_name(self):
         """Returns name of semester."""
