@@ -19,7 +19,7 @@ class Semester(models.Model):
 
     visible = models.BooleanField(verbose_name='widoczny', default=False)
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, verbose_name='rodzaj semestru')
-    year = models.CharField(max_length=7, default='0', verbose_name='rok akademicki')
+    year = models.CharField(max_length=7, default='0', verbose_name='rok akademicki',help_text='Format: XXXX/YY')
     records_opening = models.DateTimeField(
         null=True,
         blank=True,
@@ -50,14 +50,16 @@ class Semester(models.Model):
         null=True,
         blank=True,
         related_name='fgrade',
-        on_delete=models.CASCADE)
+        on_delete=models.CASCADE,
+        help_text=('Semestr zimowy z poprzedniego roku akademickiego.'))
     second_grade_semester = models.ForeignKey(
         'self',
         verbose_name='Drugi semester oceny',
         null=True,
         blank=True,
         related_name='sgrade',
-        on_delete=models.CASCADE)
+        on_delete=models.CASCADE,
+        help_text=('Semestr letni z poprzedniego roku akademickiego.'))
 
     usos_kod = models.CharField(
         blank=True,
@@ -304,7 +306,7 @@ class ChangedDay(models.Model):
             raise ValidationError(message={
                 'weekday': ['To już jest ' + days_of_week.DAYS_OF_WEEK[self.day.weekday()][1]]
             },
-                                  code='invalid')
+                code='invalid')
 
     @classmethod
     def get_day_of_week(cls, date):
