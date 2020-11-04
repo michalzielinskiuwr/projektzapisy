@@ -5,10 +5,10 @@ export interface ThesisInfo {
   id: number;
   title: string;
   is_available: boolean;
+  reserved_until: string;
   kind: string;
   status: string;
   modified: number;
-  has_been_accepted: boolean;
   advisor: string;
   advisor_last_name: string;
   students: string;
