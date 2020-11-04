@@ -2,7 +2,6 @@ import json
 import os.path
 from typing import List, Union
 
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 
 from apps.enrollment.courses.models.course_instance import CourseInstance
@@ -253,7 +252,7 @@ class Schema(models.Model):
     :param type: a type of poll for the defined `questions` schema.
     """
 
-    questions = JSONField(default=dict)
+    questions = models.JSONField(default=dict)
     type = models.SmallIntegerField("Kategoria", choices=PollType.choices)
 
     class Meta:
@@ -360,7 +359,7 @@ class Submission(models.Model):
 
     schema = models.ForeignKey(Schema, on_delete=models.SET_NULL, null=True)
     poll = models.ForeignKey(Poll, on_delete=models.SET_NULL, null=True)
-    answers = JSONField(default=dict)
+    answers = models.JSONField(default=dict)
     ticket = models.TextField(unique=True)
     submitted = models.BooleanField(default=False)
     created = models.DateTimeField(auto_now_add=True)

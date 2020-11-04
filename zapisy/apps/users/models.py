@@ -130,7 +130,7 @@ class Program(models.Model):
 class PersonalDataConsent(models.Model):
     """Stores students' data processing consents."""
     student = models.OneToOneField(Student, related_name='consent', on_delete=models.CASCADE)
-    granted = models.NullBooleanField(verbose_name="zgoda udzielona")
+    granted = models.BooleanField("zgoda udzielona", null=True)
 
     class Meta:
         verbose_name = 'Zgoda na udostępnianie danych osobowych'
