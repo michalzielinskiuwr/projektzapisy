@@ -20,7 +20,7 @@ class Semester(models.Model):
     visible = models.BooleanField(verbose_name='widoczny', default=False)
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, verbose_name='rodzaj semestru')
     year = models.CharField(max_length=7, validators=[RegexValidator(
-        regex='\d{4}/\d{2}', message='Format XXXX/YY')], verbose_name='rok akademicki')
+        regex=r'\d{4}/\d{2}', message='Format XXXX/YY')], verbose_name='rok akademicki')
     records_opening = models.DateTimeField(
         null=True,
         blank=True,
