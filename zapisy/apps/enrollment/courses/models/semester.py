@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
-from django.core.validators import ValidationError
+from django.core.validators import RegexValidator, ValidationError
 from django.db import models
 
 from apps.common import days_of_week
@@ -19,7 +19,8 @@ class Semester(models.Model):
 
     visible = models.BooleanField(verbose_name='widoczny', default=False)
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, verbose_name='rodzaj semestru')
-    year = models.CharField(max_length=7, default='0', verbose_name='rok akademicki',help_text='Format: XXXX/YY')
+    year = models.CharField(max_length=7, validators=[RegexValidator(
+        regex='\d{4}/\d{2}', message='Format XXXX/YY')], verbose_name='rok akademicki')
     records_opening = models.DateTimeField(
         null=True,
         blank=True,
@@ -31,9 +32,9 @@ class Semester(models.Model):
         null=True, blank=True, verbose_name='Czas zamknięcia wypisów')
 
     lectures_beginning = models.DateField(
-        null=True, blank=True, verbose_name='Dzień rozpoczęcia zajęć')
+        null=False, verbose_name='Dzień rozpoczęcia zajęć')
     lectures_ending = models.DateField(
-        null=True, blank=True, verbose_name='Dzień zakończenia zajęć')
+        null=False, verbose_name='Dzień zakończenia zajęć')
 
     semester_beginning = models.DateField(null=False, verbose_name='Data rozpoczęcia semestru')
     semester_ending = models.DateField(null=False, verbose_name='Data zakończenia semestru')
