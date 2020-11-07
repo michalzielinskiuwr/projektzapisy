@@ -27,7 +27,7 @@ class Semester(models.Model):
         verbose_name='Czas otwarcia zapisów',
         help_text='Godzina powinna być ustawiona na 00:00:00, by studenci mieli otwarcie między 10:00 a 22:00.')
     records_closing = models.DateTimeField(
-        null=True, blank=True, verbose_name='Czas zamkniecia zapisów')
+        null=True, blank=True, verbose_name='Czas zamknięcia zapisów')
     records_ending = models.DateTimeField(
         null=True, blank=True, verbose_name='Czas zamknięcia wypisów')
 
