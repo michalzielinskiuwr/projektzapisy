@@ -26,7 +26,9 @@ class MyProfileSemesterInfoTestCase(TestCase):
             records_closing=datetime.now() + timedelta(days=15),
             records_ects_limit_abolition=datetime.now() + timedelta(days=5),
             semester_beginning=datetime.now() + timedelta(days=20),
-            semester_ending=datetime.now() + timedelta(days=100)
+            semester_ending=datetime.now() + timedelta(days=100),
+            lectures_beginning=datetime.now() + timedelta(days=20),
+            lextures_ending=datetime.now() + timedelta(days=100)
         )
         cls.semester.full_clean()
         cls.semester.save()
