@@ -36,8 +36,8 @@ class Semester(models.Model):
     lectures_ending = models.DateField(
         null=False, verbose_name='Dzień zakończenia zajęć')
 
-    semester_beginning = models.DateField(null=False, verbose_name='Data rozpoczęcia semestru')
-    semester_ending = models.DateField(null=False, verbose_name='Data zakończenia semestru')
+    semester_beginning = models.DateField(null=True, blank=True, verbose_name='Data rozpoczęcia semestru')
+    semester_ending = models.DateField(null=True, blank=True, verbose_name='Data zakończenia semestru')
 
     is_grade_active = models.BooleanField(verbose_name='Ocena aktywna', default=False)
     records_ects_limit_abolition = models.DateTimeField(
