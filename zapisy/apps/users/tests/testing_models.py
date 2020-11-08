@@ -28,7 +28,7 @@ class MyProfileSemesterInfoTestCase(TestCase):
             semester_beginning=datetime.now() + timedelta(days=20),
             semester_ending=datetime.now() + timedelta(days=100),
             lectures_beginning=datetime.now() + timedelta(days=20),
-            lextures_ending=datetime.now() + timedelta(days=100)
+            lectures_ending=datetime.now() + timedelta(days=100)
         )
         cls.semester.full_clean()
         cls.semester.save()
