@@ -31,9 +31,9 @@ class Semester(models.Model):
         null=True, blank=True, verbose_name='Czas zamknięcia wypisów')
 
     lectures_beginning = models.DateField(
-        null=True, blank=True, verbose_name='Dzień rozpoczęcia zajęć')
+        null=False, verbose_name='Dzień rozpoczęcia zajęć')
     lectures_ending = models.DateField(
-        null=True, blank=True, verbose_name='Dzień zakończenia zajęć')
+        null=False, verbose_name='Dzień zakończenia zajęć')
 
     semester_beginning = models.DateField(null=False, verbose_name='Data rozpoczęcia semestru')
     semester_ending = models.DateField(null=False, verbose_name='Data zakończenia semestru')
