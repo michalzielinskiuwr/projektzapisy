@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned
-from django.core.validators import ValidationError
+from django.core.validators import RegexValidator, ValidationError
 from django.db import models
 
 from apps.common import days_of_week
@@ -19,14 +19,15 @@ class Semester(models.Model):
 
     visible = models.BooleanField(verbose_name='widoczny', default=False)
     type = models.CharField(max_length=1, choices=TYPE_CHOICES, verbose_name='rodzaj semestru')
-    year = models.CharField(max_length=7, default='0', verbose_name='rok akademicki',help_text='Format: XXXX/YY')
+    year = models.CharField(max_length=7, validators=[RegexValidator(
+        regex=r'\d{4}/\d{2}', message='Format XXXX/YY')], verbose_name='rok akademicki')
     records_opening = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name='Czas otwarcia zapisów',
         help_text='Godzina powinna być ustawiona na 00:00:00, by studenci mieli otwarcie między 10:00 a 22:00.')
     records_closing = models.DateTimeField(
-        null=True, blank=True, verbose_name='Czas zamkniecia zapisów')
+        null=True, blank=True, verbose_name='Czas zamknięcia zapisów')
     records_ending = models.DateTimeField(
         null=True, blank=True, verbose_name='Czas zamknięcia wypisów')
 
@@ -35,8 +36,8 @@ class Semester(models.Model):
     lectures_ending = models.DateField(
         null=False, verbose_name='Dzień zakończenia zajęć')
 
-    semester_beginning = models.DateField(null=False, verbose_name='Data rozpoczęcia semestru')
-    semester_ending = models.DateField(null=False, verbose_name='Data zakończenia semestru')
+    semester_beginning = models.DateField(null=True, blank=True, verbose_name='Data rozpoczęcia semestru')
+    semester_ending = models.DateField(null=True, blank=True, verbose_name='Data zakończenia semestru')
 
     is_grade_active = models.BooleanField(verbose_name='Ocena aktywna', default=False)
     records_ects_limit_abolition = models.DateTimeField(
