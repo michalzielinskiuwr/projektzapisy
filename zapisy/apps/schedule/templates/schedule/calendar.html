@@ -1,3 +1,13 @@
 {% extends 'schedule/base.html' %}
+{% load render_bundle from webpack_loader %}
+{% load static %}
 
 {% block schedule_calendar %} class="active"{% endblock %}
+
+{% block all-content %}
+
+ <div id='calendar'></div>
+
+{% render_bundle 'schedule-fullcalendar' %}
+
+{% endblock %}
