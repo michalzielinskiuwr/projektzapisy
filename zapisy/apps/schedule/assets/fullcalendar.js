@@ -5,8 +5,12 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 
 
-async function fetchEvents() {
+async function fetchEvents(fetchInfo) {
   let url = new URL("http://127.0.0.1:8000/classrooms/events/");
+  url.search = new URLSearchParams({
+    start: fetchInfo.start.toISOString(),
+    end: fetchInfo.end.toISOString(),
+  });
   const response = await fetch(url);
   return response.json();
 }

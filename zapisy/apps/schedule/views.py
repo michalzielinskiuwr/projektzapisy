@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.http import JsonResponse
 from django.template.response import TemplateResponse
 
 from apps.schedule.models.term import Term
+from apps.enrollment.courses.models.classroom import Classroom
+
 
 
 def calendar(request):
@@ -30,21 +32,35 @@ def session(request):
     return TemplateResponse(request, 'schedule/session.html', locals())
 
 
+# TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
+#  Admin can see others unaccepted events
+
 def events(request):
-    sdate = datetime(2020, 10, 1).date()  # start date
-    edate = datetime(2021, 2, 28).date()  # end date
+    type = request.GET.get('type', '2')
+    status = request.GET.get('status', '1')
+    visible = bool(request.GET.get('visible', True))
+    room = request.GET.get('room', '')
+    start = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
+    end = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
 
-    delta = edate - sdate
-    days = []
+    query = Term.objects.filter(day__range=[start, end]).select_related('event')
+    room = Classroom.objects.filter(number=room).first() if room else None
+    if room:
+        query = query.filter(room=room)
+    if type:
+        query = query.filter(event__type=type)
+    if visible:
+        query = query.filter(event__visible=visible)
+    if status:
+        query = query.filter(event__status=status)
 
-    for i in range(delta.days + 1):
-        day = sdate + timedelta(days=i)
-        days.append(day)
-
-    query = Term.objects.filter(day__in=days, event__type="2").select_related('event')
     payload = []
     for term in query:
-        payload.append({"title":    term.event.title,
-                        "start":    datetime.combine(term.day, term.start).isoformat(),
-                        "end":      datetime.combine(term.day, term.end).isoformat()})
+        event = term.event
+        payload.append({"title": event.title,
+                        "description": event.description,
+                        "type": event.type,
+                        "visible": event.visible,
+                        "start": datetime.combine(term.day, term.start).isoformat(),
+                        "end": datetime.combine(term.day, term.end).isoformat()})
     return JsonResponse(payload, safe=False)
