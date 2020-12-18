@@ -47,7 +47,7 @@
       become: yes
       become_user: "{{ deploy_user }}"
       pip:
-        virtualenv: "{{ deploy_helper.new_release_path }}/env3"
+        virtualenv: "{{ deploy_helper.new_release_path }}/venv"
         virtualenv_command: "{{ ansible_python_interpreter }} -m venv"
         requirements: "{{ deploy_helper.new_release_path }}/zapisy/requirements.production.txt"
 
@@ -80,25 +80,26 @@
       django_manage:
         command: migrate
         app_path: "{{ deploy_helper.new_release_path }}/zapisy"
-        virtualenv: "{{ deploy_helper.new_release_path }}/env3"
+        virtualenv: "{{ deploy_helper.new_release_path }}/venv"
 
     - name: Make sure that directory for gunicorn exists
       become: yes
       become_user: "{{ deploy_user }}"
       file:
-        path: "{{ deploy_helper.new_release_path }}/env3/run/"
+        path: "{{ deploy_helper.new_release_path }}/venv/run/"
         state: directory
 
     - name: Install dependencies based on package.json
       become: yes
       become_user: "{{ deploy_user }}"
-      yarn:
-        path: "{{ deploy_helper.new_release_path }}/zapisy/"
+      command: yarnpkg install --immutable
+      args:
+        chdir: "{{ deploy_helper.new_release_path }}/zapisy/"
 
     - name: Build project
       become: yes
       become_user: "{{ deploy_user }}"
-      command: yarn build
+      command: yarnpkg build
       args:
         chdir: "{{ deploy_helper.new_release_path }}/zapisy/"
 
@@ -108,7 +109,7 @@
       django_manage:
         command: collectstatic
         app_path: "{{ deploy_helper.new_release_path }}/zapisy"
-        virtualenv: "{{ deploy_helper.new_release_path }}/env3"
+        virtualenv: "{{ deploy_helper.new_release_path }}/venv"
 
     - name: Finalize the deploy, removing the unfinished file and switching the symlink
       become: yes
@@ -133,13 +134,13 @@
         user: "{{ ansible_user }}"
         revision: "{{ git_rev.stdout }}"
         comment: "Deploy {{ deploy_version }} on {{ ansible_host }}"
-      when: rollbar_token != "none"
+      when: rollbar_token != "placeholder"
 
     - name: Create link to socket for Nginx
       become: yes
       become_user: "{{ deploy_user }}"
       file:
-        src: "/home/{{ deploy_user }}/deploy/current/env3/run"
+        src: "/home/{{ deploy_user }}/deploy/current/venv/run"
         dest: "/home/{{ deploy_user }}/deploy/current/zapisy/socket"
         force: yes
         state: link
