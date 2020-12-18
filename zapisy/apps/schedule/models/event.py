@@ -62,7 +62,7 @@ class Event(models.Model):
 
         if self.group:
             return reverse('group-view', args=[str(self.group_id)])
-        return reverse('events:show', args=[str(self.pk)])
+        return reverse('schedule:show', args=[str(self.pk)])
 
     class Meta:
         app_label = 'schedule'

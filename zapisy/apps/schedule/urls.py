@@ -9,5 +9,6 @@ urlpatterns = [
     path('report/', views.report, name='report'),
     path('reservation/', views.reservation, name='reservation'),
     path('session/', views.session, name='session'),
-    path('events/', views.events, name="events")
+    path('events/', views.events, name="events"),
+    path('events/<int:event_id>/', views.event, name='show'),
 ]
