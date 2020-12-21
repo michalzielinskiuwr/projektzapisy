@@ -10,6 +10,8 @@ from apps.enrollment.courses.models.classroom import Classroom
 
 
 def calendar(request):
+    room = None
+    rooms = Classroom.get_in_institute(reservation=True)
     return TemplateResponse(request, 'schedule/calendar.html', locals())
 
 

@@ -4,46 +4,65 @@ import bootstrapPlugin from "@fullcalendar/bootstrap";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 
-
 async function fetchEvents(fetchInfo) {
-  let url = new URL("http://127.0.0.1:8000/classrooms/events/");
-  url.search = new URLSearchParams({
-    start: fetchInfo.start.toISOString(),
-    end: fetchInfo.end.toISOString(),
-  });
-  const response = await fetch(url);
-  return response.json();
+    // let url = new URL("http://127.0.0.1:8000/classrooms/events/");
+    let url = new URL("http://192.168.0.16:8000/classrooms/events/");
+    let searchParams = url.searchParams;
+    searchParams = new URLSearchParams({
+        start: fetchInfo.start.toISOString(),
+        end: fetchInfo.end.toISOString(),
+    });
+
+    let room_id = $('#room_selector').find("option:selected").attr("value");
+    if (room_id === "all")
+        searchParams.delete('room');
+    else
+        searchParams.set("room", room_id);
+
+    url.search = searchParams.toString();
+    let new_url = url.toString();
+
+    const response = await fetch(new_url);
+    return response.json();
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-  const calendarEl = document.getElementById("calendar");
+let calendarEl, calendar;
 
-  const calendar = new Calendar(calendarEl, {
-    plugins: [dayGridPlugin, timeGridPlugin, bootstrapPlugin],
+document.addEventListener("DOMContentLoaded", function() {
+    calendarEl = document.getElementById("calendar");
 
-    themeSystem: "bootstrap",
-    initialView: "timeGridWeek",
-    locale: plLocale,
+    calendar = new Calendar(calendarEl, {
+        plugins: [dayGridPlugin, timeGridPlugin, bootstrapPlugin],
 
-    buttonText: {
-      prev: "<",
-      next: ">",
-    },
-    height: "auto",
+        themeSystem: "bootstrap",
+        initialView: "timeGridWeek",
+        locale: plLocale,
 
-    //allDaySlot: false,
-    slotMinTime: "08:00:00",
-    slotMaxTime: "22:00:00",
+        buttonText: {
+            prev: "<",
+            next: ">",
+        },
+        height: "auto",
 
-    headerToolbar: {
-      start: "prev,next today",
-      center: "title",
-      end: "timeGridDay,timeGridWeek,dayGridMonth",
-    },
+        //allDaySlot: false,
+        slotMinTime: "08:00:00",
+        slotMaxTime: "22:00:00",
 
-    eventDisplay: 'list-item',
-    events: fetchEvents,
-  });
+        headerToolbar: {
+            start: "prev,next today",
+            center: "title",
+            end: "timeGridDay,timeGridWeek,dayGridMonth",
+        },
 
-  calendar.render();
+        eventDisplay: 'list-item',
+        events: fetchEvents,
+    });
+
+    calendar.render();
+
+    $('#room_selector').on('change', function() {
+        // let filter_id = $(this).find("option:selected").attr("value");
+        // console.log("room_selector changed. filter_id = " + filter_id);
+        calendar.refetchEvents();
+    });
 });

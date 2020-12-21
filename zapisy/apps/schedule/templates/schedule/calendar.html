@@ -2,12 +2,73 @@
 {% load render_bundle from webpack_loader %}
 {% load static %}
 
-{% block schedule_calendar %} class="active"{% endblock %}
+{% block schedule_calendar %} class="active" {% endblock %}
+
+{% block bread %}
+    <li class="breadcrumb-item"><a href="{% url 'main-page' %}">Strona główna</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Sale + Wydarzenia</li>
+{% endblock %}
 
 {% block all-content %}
+<h2>{% block calendartitle %} Sale + Wydarzenia {% endblock %}</h2>
+{% block calendarview %}
+<div class="alert alert-info fade show" role="alert">
+    Wybierz daty, sale, jednostki oraz typ wydarzenia do wyświetlenia.
+</div>
 
- <div id='calendar'></div>
+<form>
+    <div class="form-row">
+        <div class="form-group col-sm-3">
+            {% regroup rooms by get_floor_display as floor_list %}
+            <label for="room_selector">Wybierz sale:</label>
+            <select class="form-control" id="room_selector">
+                <option value="all" selected="selected">Wszystkie</option>
+                {% for floor in floor_list %}
+                    <optgroup label="{{ floor.grouper }}">
+                        {% for r in floor.list %}
+                            <option value="{{ r.number }}">{{ r.number }}</option>
+                        {% endfor %}
+                    </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group col-sm-3">
+            <label for="title_author_input">Tytuł/Autor wydarzenia:</label>
+            <input type="text" class="form-control" id="title_author_input" placeholder="Seminarium lub Jan Nowak">
+        </div>
+        <div class="form-group col-sm-4">
+            <label>Typ wydarzenia:</label>
+            <div class="row" style="margin-left: 0px;">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" value="" id="event_checkbox" checked>
+                    <label class="form-check-label" for="event_checkbox">Wydarzenie</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" value="" id="test_checkbox" checked>
+                    <label class="form-check-label" for="test_checkbox">Kolokwium</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" value="" id="exam_checkbox" checked>
+                    <label class="form-check-label" for="exam_checkbox">Egzamin</label>
+                </div>
+            </div>
+            <div class="row" style="margin-left: 0px;">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" value="" id="classes_checkbox" checked>
+                    <label class="form-check-label" for="classes_checkbox">Zajęcia</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" value="" id="other_checkbox" checked>
+                    <label class="form-check-label" for="other_checkbox">Pozostałe</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
 
 {% render_bundle 'schedule-fullcalendar' %}
+<!-- todo calendar render and filters -->
+<div id='calendar'></div>
 
-{% endblock %}
+{% endblock calendarview %}
+{% endblock all-content %}
