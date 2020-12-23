@@ -5,24 +5,22 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 
 async function fetchEvents(fetchInfo) {
-    // let url = new URL("http://127.0.0.1:8000/classrooms/events/");
-    let url = new URL("http://192.168.0.16:8000/classrooms/events/");
-    let searchParams = url.searchParams;
-    searchParams = new URLSearchParams({
-        start: fetchInfo.start.toISOString(),
-        end: fetchInfo.end.toISOString(),
-    });
+    let url = new URL("http://127.0.0.1:8000/classrooms/terms/");
+    //let url = new URL("http://192.168.0.16:8000/classrooms/events/");
+    url.searchParams.set("start", fetchInfo.start.toISOString())
+    url.searchParams.set("end", fetchInfo.end.toISOString())
 
     let room_id = $('#room_selector').find("option:selected").attr("value");
     if (room_id === "all")
-        searchParams.delete('room');
+        url.searchParams.delete('room');
     else
-        searchParams.set("room", room_id);
+        url.searchParams.set("room", room_id);
 
-    url.search = searchParams.toString();
-    let new_url = url.toString();
+    let title_author_input = $('#title_author_input').val()
+    if (title_author_input)
+        url.searchParams.set("title_author", title_author_input);
 
-    const response = await fetch(new_url);
+    const response = await fetch(url);
     return response.json();
 }
 
@@ -63,6 +61,9 @@ document.addEventListener("DOMContentLoaded", function() {
     $('#room_selector').on('change', function() {
         // let filter_id = $(this).find("option:selected").attr("value");
         // console.log("room_selector changed. filter_id = " + filter_id);
+        calendar.refetchEvents();
+    });
+    $('#title_author_input').on('change', function() {
         calendar.refetchEvents();
     });
 });
