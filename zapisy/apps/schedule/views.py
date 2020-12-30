@@ -53,19 +53,21 @@ def terms(request):
         place = str(request.GET.get('place', ''))
         title_or_author = str(request.GET.get('title_author', ''))
         types = request.GET.get('types', [Event.TYPE_GENERIC])
+        types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
             raise ValueError
         for type_ in types:
             if not any(type_ == t for t, _ in Event.TYPES):
                 raise ValueError
         statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
+        statuses = statuses.split(',') if isinstance(statuses, str) else statuses
         if not isinstance(statuses, list):
             raise ValueError
         for status in statuses:
             if not any(status == s for s, _ in Event.STATUSES):
                 raise ValueError
         rooms = request.GET.get('rooms', [])
-        rooms = rooms.split(',') if rooms else []
+        rooms = rooms.split(',') if rooms else rooms
         if not isinstance(rooms, list):
             raise ValueError
         for room in rooms:
@@ -119,12 +121,14 @@ def events(request):
         visible = bool(request.GET.get('visible', True))
         title_or_author = str(request.GET.get('title_author', ''))
         types = request.GET.get('types', [Event.TYPE_GENERIC])
+        types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
             raise ValueError
         for type in types:
             if not any(type == t for t, _ in Event.TYPES):
                 raise ValueError
         statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
+        statuses = statuses.split(',') if isinstance(statuses, str) else statuses
         if not isinstance(statuses, list):
             raise ValueError
         for status in statuses:
