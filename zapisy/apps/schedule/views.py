@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from django.template.response import TemplateResponse
 
 from apps.schedule.models.term import Term
@@ -35,38 +35,57 @@ def session(request):
     return TemplateResponse(request, 'schedule/session.html', locals())
 
 
+# TODO check if events is enough to replace exams function
 # TODO make url, return similar data to /events/ ,but with rooms
 def exams(request):
     pass
 
 
-# TODO: many rooms filter
-
 # TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
 #  Admin can see others unaccepted events
 # Sends only required data for fullcalendar
 def terms(request):
-    type = request.GET.get('type', '2')
-    status = request.GET.get('status', '1')
-    visible = bool(request.GET.get('visible', True))
-    room = request.GET.get('room', '')
-    place = request.GET.get('place', '')
-    title_or_author = request.GET.get('title_author', '')
-    start = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
-    end = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
+    # GET parameters checking
+    try:
+        start = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
+        end = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
+        visible = bool(request.GET.get('visible', True))
+        place = str(request.GET.get('place', ''))
+        title_or_author = str(request.GET.get('title_author', ''))
+        types = request.GET.get('types', [Event.TYPE_GENERIC])
+        if not isinstance(types, list):
+            raise ValueError
+        for type_ in types:
+            if not any(type_ == t for t, _ in Event.TYPES):
+                raise ValueError
+        statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
+        if not isinstance(statuses, list):
+            raise ValueError
+        for status in statuses:
+            if not any(status == s for s, _ in Event.STATUSES):
+                raise ValueError
+        rooms = request.GET.get('rooms', [])
+        rooms = rooms.split(',') if rooms else []
+        if not isinstance(rooms, list):
+            raise ValueError
+        for room in rooms:
+            if not isinstance(room, str):
+                raise ValueError
+    except (ValueError, TypeError):
+        raise Http404
 
     query = Term.objects.filter(day__range=[start, end]).select_related('event')
-    room = Classroom.objects.filter(number=room).first() if room else None
-    if room:
-        query = query.filter(room=room)
+    rooms = Classroom.objects.filter(number__in=rooms) if rooms else None
+    if rooms:
+        query = query.filter(room__in=rooms)
     if place:
         query = query.filter(place=place)
-    if type:
-        query = query.filter(event__type=type)
+    if types:
+        query = query.filter(event__type__in=types)
     if visible:
         query = query.filter(event__visible=visible)
-    if status:
-        query = query.filter(event__status=status)
+    if statuses:
+        query = query.filter(event__status__in=statuses)
     if title_or_author:
         author_names = title_or_author.split()
         first_name = author_names[0]
@@ -90,24 +109,38 @@ def terms(request):
     return JsonResponse(payload, safe=False)
 
 
-# TODO: many rooms nad types filter
+# TODO: time filtering or semester filtering. Add sorting by created or edited date if necessary
 # TODO: event pagination, so client can get only necessary events for current page
 # TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
 #  Admin can see others unaccepted events
 def events(request):
-    type = request.GET.get('type', '2')
-    status = request.GET.get('status', '1')
-    visible = bool(request.GET.get('visible', True))
-    title_or_author = request.GET.get('title_author', '')
+    # GET parameters checking
+    try:
+        visible = bool(request.GET.get('visible', True))
+        title_or_author = str(request.GET.get('title_author', ''))
+        types = request.GET.get('types', [Event.TYPE_GENERIC])
+        if not isinstance(types, list):
+            raise ValueError
+        for type in types:
+            if not any(type == t for t, _ in Event.TYPES):
+                raise ValueError
+        statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
+        if not isinstance(statuses, list):
+            raise ValueError
+        for status in statuses:
+            if not any(status == s for s, _ in Event.STATUSES):
+                raise ValueError
+    except (ValueError, TypeError):
+        raise Http404
 
     # TODO: events filtering, similar to Event.get_event_or_404(event_id, request.user) but for many events,
     query = Event.objects.filter().select_related('author')
-    if type:
-        query = query.filter(type=type)
+    if types:
+        query = query.filter(type__in=types)
     if visible:
         query = query.filter(visible=visible)
-    if status:
-        query = query.filter(status=status)
+    if statuses:
+        query = query.filter(status__in=statuses)
     if title_or_author:
         author_names = title_or_author.split()
         first_name = author_names[0]

@@ -12,9 +12,9 @@ async function fetchEvents(fetchInfo) {
 
     let room_id = $('#room_selector').find("option:selected").attr("value");
     if (room_id === "all")
-        url.searchParams.delete('room');
+        url.searchParams.delete('rooms');
     else
-        url.searchParams.set("room", room_id);
+        url.searchParams.set("rooms", [room_id]);
 
     let title_author_input = $('#title_author_input').val()
     if (title_author_input)
