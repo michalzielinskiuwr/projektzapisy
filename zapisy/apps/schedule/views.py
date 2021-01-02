@@ -1,8 +1,12 @@
+import json
 from datetime import datetime
 
+from django.contrib.auth.models import User
 from django.db.models import Q
-from django.http import JsonResponse, Http404
+from django.http import JsonResponse, Http404, HttpResponseBadRequest, HttpResponse
 from django.template.response import TemplateResponse
+from django.core.exceptions import PermissionDenied
+from django.views.decorators.csrf import csrf_exempt
 
 from apps.schedule.models.term import Term
 from apps.schedule.models.event import Event
@@ -41,6 +45,7 @@ def exams(request):
     pass
 
 
+# TODO: Ask if GET parameters checking is necessary. 404 vs 500 response
 # TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
 #  Admin can see others unaccepted events
 # Sends only required data for fullcalendar
@@ -55,21 +60,21 @@ def terms(request):
         types = request.GET.get('types', [Event.TYPE_GENERIC])
         types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
-            raise ValueError
+            raise TypeError
         for type_ in types:
             if not any(type_ == t for t, _ in Event.TYPES):
                 raise ValueError
         statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
         statuses = statuses.split(',') if isinstance(statuses, str) else statuses
         if not isinstance(statuses, list):
-            raise ValueError
+            raise TypeError
         for status in statuses:
             if not any(status == s for s, _ in Event.STATUSES):
                 raise ValueError
         rooms = request.GET.get('rooms', [])
         rooms = rooms.split(',') if rooms else rooms
         if not isinstance(rooms, list):
-            raise ValueError
+            raise TypeError
         for room in rooms:
             if not isinstance(room, str):
                 raise ValueError
@@ -111,11 +116,61 @@ def terms(request):
     return JsonResponse(payload, safe=False)
 
 
+# gets json, same structure like in GET
+# TODO: transaction atomic for creating Event and Terms
+# TODO: Is creating normal class events required? Ask
+@csrf_exempt
+def events_post(request):
+    payload = json.loads(request.body)
+    try:
+        title = str(payload.get('title', ''))
+        description = str(payload.get('description', ''))
+        visible = bool(payload.get('visible', True))
+        type_ = payload.get('type', [Event.TYPE_GENERIC])
+        if not any(type_ == t for t, _ in Event.TYPES):
+            raise ValueError
+        terms = payload.get('terms', [])
+        if not isinstance(terms, list):
+            raise TypeError
+        if not terms:
+            raise ValueError
+        for term in terms:
+            if not isinstance(term, dict):
+                raise TypeError
+            term['start'] = datetime.strptime(term['start'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            term['end'] = datetime.strptime(term['end'], '%Y-%m-%dT%H:%M:%S.%fZ')
+            if term['start'].date() != term['end'].date():
+                raise ValueError
+            if not any(k in term for k in ('room', 'place')):
+                raise KeyError
+    except (ValueError, TypeError, KeyError):
+        raise Http404
+
+    # TODO: change author to request.user and change Event status to STATUS_PENDING
+    author = User.objects.get(first_name='M_74', last_name='B_74')
+    event = Event.objects.create(title=title, author=author, description=description, type=type_, visible=visible,
+                                 status=Event.STATUS_ACCEPTED)
+    for term in terms:
+        room = Classroom.objects.get(number=term['room']) if 'room' in term else None
+        place = term['place'] if 'place' in term else None
+        term = Term(event=event, day=term["start"].date(), start=term["start"].time(), end=term["end"].time())
+        if room:
+            term.room = room
+        else:
+            term.place = place
+        term.save()
+    # return HttpResponseBadRequest()
+    return HttpResponse(status=201)
+
+
 # TODO: time filtering or semester filtering. Add sorting by created or edited date if necessary
 # TODO: event pagination, so client can get only necessary events for current page
 # TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
 #  Admin can see others unaccepted events
+@csrf_exempt
 def events(request):
+    if request.method == "POST":
+        return events_post(request)
     # GET parameters checking
     try:
         visible = bool(request.GET.get('visible', True))
@@ -123,14 +178,14 @@ def events(request):
         types = request.GET.get('types', [Event.TYPE_GENERIC])
         types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
-            raise ValueError
-        for type in types:
-            if not any(type == t for t, _ in Event.TYPES):
+            raise TypeError
+        for type_ in types:
+            if not any(type_ == t for t, _ in Event.TYPES):
                 raise ValueError
         statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
         statuses = statuses.split(',') if isinstance(statuses, str) else statuses
         if not isinstance(statuses, list):
-            raise ValueError
+            raise TypeError
         for status in statuses:
             if not any(status == s for s, _ in Event.STATUSES):
                 raise ValueError
@@ -165,10 +220,10 @@ def events(request):
                         "terms": [{"start": t.start,
                                    "end": t.end,
                                    "day:": t.day,
-                                   "room": t.room.number,
+                                   "room": t.room.number if t.room else None,
                                    # TODO fix this to show proper url, not just /classrooms/ (main callendar without room filtering)
                                    # TODO look into room model implementation for TODO there
-                                   "room_url": t.room.get_absolute_url(),
+                                   "room_url": t.room.get_absolute_url() if t.room else None,
                                    "place": t.place} for t in terms],
                         "description": event.description,
                         "author": author.get_full_name(),
@@ -191,10 +246,10 @@ def event(request, event_id):
                          "terms": [{"start": t.start,
                                     "end": t.end,
                                     "day:": t.day,
-                                    "room": t.room.number,
+                                    "room": t.room.number if t.room else None,
                                     # TODO fix this to show proper url, not just /classrooms/ (main callendar without room filtering)
                                     # TODO look into room model implementation for TODO there
-                                    "room_url": t.room.get_absolute_url(),
+                                    "room_url": t.room.get_absolute_url() if t.room else None,
                                     "place": t.place} for t in terms],
                          "description": event.description,
                          "author": author.get_full_name(),
