@@ -178,6 +178,48 @@ def create_event(request):
     return HttpResponse("<html><body>Event created</body></html>", status=201)
 
 
+@csrf_exempt
+def update_event(request, event_id):
+    payload = _check_and_prepare_post_payload(request)
+    event = Event.objects.get(pk=event_id)
+    event.title = payload['title']
+    event.description = payload['description']
+    event.type = payload['type']
+    event.visible = payload['visible']
+    event.status = payload['status']
+    event.save()
+    terms = event.term_set.all().select_related('room')
+    for payload_term in payload['terms']:
+        payload_term['matched'] = False
+    for term in terms:
+        matched = False
+        for payload_term in payload['terms']:
+            if term.room and 'room' in payload_term and term.room.number != payload_term['room'] or\
+                    term.place and 'place' in payload_term and term.place != payload_term['place']:
+                continue
+            if not term.day == payload_term['start'].date():
+                continue
+            if not term.start == payload_term['start'].time() and term.end == payload_term['end'].time():
+                continue
+            matched = True
+            payload_term['matched'] = True
+            break
+        if not matched:
+            term.delete()
+    for payload_term in payload['terms']:
+        if not payload_term['matched']:
+            room = Classroom.objects.get(number=payload_term['room']) if 'room' in payload_term else None
+            place = payload_term['place'] if 'place' in payload_term else None
+            term = Term(event=event, day=payload_term["start"].date(), start=payload_term["start"].time(),
+                        end=payload_term["end"].time())
+            if room:
+                term.room = room
+            else:
+                term.place = place
+            term.save()
+    return HttpResponse("<html><body>Event updated</body></html>", status=200)
+
+
 # TODO: time filtering or semester filtering. Add sorting by created or edited date if necessary
 # TODO: event pagination, so client can get only necessary events for current page
 # TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
@@ -233,12 +275,6 @@ def events(request):
 def delete_event(request, event_id):
     Event.objects.get(pk=event_id).delete()
     return HttpResponse("<html><body>Event deleted</body></html>", status=200)
-
-
-@csrf_exempt
-def update_event(request, event_id):
-    # TODO
-    return HttpResponse("<html><body>Event updated</body></html>", status=200)
 
 
 # TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
