@@ -199,7 +199,7 @@ def update_event(request, event_id):
                 continue
             if not term.day == payload_term['start'].date():
                 continue
-            if not term.start == payload_term['start'].time() and term.end == payload_term['end'].time():
+            if not term.start == payload_term['start'].time() or not term.end == payload_term['end'].time():
                 continue
             matched = True
             payload_term['matched'] = True
