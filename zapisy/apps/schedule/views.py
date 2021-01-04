@@ -4,8 +4,10 @@ from datetime import datetime
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.http import JsonResponse, Http404, HttpResponseBadRequest, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.core.exceptions import PermissionDenied
+from django.core.validators import ValidationError
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.schedule.models.term import Term
@@ -61,7 +63,7 @@ def _check_and_prepare_get_data(request):
             if not any(type_ == t for t, _ in Event.TYPES):
                 raise ValueError
         data['types'] = types
-        statuses = request.GET.get('statuses', [Event.STATUS_ACCEPTED])
+        statuses = request.GET.get('statuses', [])
         statuses = statuses.split(',') if isinstance(statuses, str) else statuses
         if not isinstance(statuses, list):
             raise TypeError
@@ -82,9 +84,7 @@ def _check_and_prepare_get_data(request):
         raise Http404
 
 
-# TODO: Ask if GET parameters checking is necessary. 404 vs 500 response
-# TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
-#  Admin can see others unaccepted events
+# TODO: Ask if 403 vs 500 response, ValidationError is 500, 403 == Forbidden
 # Sends only required data for fullcalendar
 def terms(request):
     data = _check_and_prepare_get_data(request)
@@ -111,6 +111,8 @@ def terms(request):
     payload = []
     for term in query:
         event = term.event
+        if not event._user_can_see_or_404(request.user):
+            continue
         payload.append({"title": event.title,
                         "status": event.status,
                         "type": event.type,
@@ -127,13 +129,14 @@ def _check_and_prepare_post_payload(request):
     checked_payload = {}
     # TODO: change author to request.user
     checked_payload['author'] = User.objects.get(first_name='M_74', last_name='B_74')
-    # TODO: change Event status to STATUS_PENDING, STATUS_ACCEPTED should be only if author is admin?
-    checked_payload['status'] = Event.STATUS_ACCEPTED
     try:
         checked_payload['title'] = str(payload.get('title', ''))
         checked_payload['description'] = str(payload.get('description', ''))
         checked_payload['visible'] = bool(payload.get('visible', True))
-        checked_payload['type'] = payload.get('type', [Event.TYPE_GENERIC])
+        checked_payload['status'] = str(payload.get('status', Event.STATUS_PENDING))
+        if not any(checked_payload['status'] == s for s, _ in Event.STATUSES):
+            raise ValueError
+        checked_payload['type'] = str(payload.get('type', Event.TYPE_GENERIC))
         if not any(checked_payload['type'] == t for t, _ in Event.TYPES):
             raise ValueError
         terms = payload.get('terms', [])
@@ -156,13 +159,50 @@ def _check_and_prepare_post_payload(request):
         raise Http404
 
 
+def _authorize_user_can_create_update_event(payload, user, event_author=None):
+    """Return True if user can create or update event. Raise ValidationError otherwise"""
+    if user.has_perm('schedule.manage_events'):
+        return True
+    if payload['author'] != user or (event_author and event_author != user):
+        raise ValidationError(
+            message={
+                'status': ['Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem']},
+            code='permission')
+    if user.student:
+        if payload['type'] != Event.TYPE_GENERIC:
+            raise ValidationError(
+                message={
+                    'status': ['Nie masz uprawnień aby dodawać wydarzenia tego typu']},
+                code='permission')
+        if payload['status'] != Event.STATUS_PENDING:
+            raise ValidationError(
+                message={
+                    'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia']},
+                code='permission')
+    # Employee can create accepted exam and test events
+    if user.employee:
+        if payload['type'] not in Event.TYPES_FOR_TEACHER:
+            raise ValidationError(
+                message={
+                    'status': ['Nie masz uprawnień aby dodawać wydarzenia tego typu']},
+                code='permission')
+        if payload['type'] == Event.TYPE_GENERIC and payload['status'] != Event.STATUS_PENDING:
+            raise ValidationError(
+                message={
+                    'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia']},
+                code='permission')
+    return True
+
+
 # gets json, same structure like in GET
 # TODO return url to new event?
 # TODO: transaction atomic for creating Event and Terms
-# TODO: Is creating normal class events required? Ask
+# TODO: Is creating normal class events required? Ask how they are made for next semester
 @csrf_exempt
 def create_event(request):
     payload = _check_and_prepare_post_payload(request)
+    # TODO: User.objects.get to request.user
+    _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'))
     event = Event.objects.create(title=payload['title'], author=payload['author'], description=payload['description'],
                                  type=payload['type'], visible=payload['visible'], status=payload['status'])
     for term in payload['terms']:
@@ -181,7 +221,9 @@ def create_event(request):
 @csrf_exempt
 def update_event(request, event_id):
     payload = _check_and_prepare_post_payload(request)
-    event = Event.objects.get(pk=event_id)
+    event = get_object_or_404(Event, pk=event_id)
+    # TODO: User.objects.get to request.user
+    _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'), event_author=event.author)
     event.title = payload['title']
     event.description = payload['description']
     event.type = payload['type']
@@ -222,14 +264,11 @@ def update_event(request, event_id):
 
 # TODO: time filtering or semester filtering. Add sorting by created or edited date if necessary
 # TODO: event pagination, so client can get only necessary events for current page
-# TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
-#  Admin can see others unaccepted events
 @csrf_exempt
 def events(request):
     if request.method == "POST":
         return create_event(request)
     data = _check_and_prepare_get_data(request)
-    # TODO: events filtering, similar to Event.get_event_or_404(event_id, request.user) but for many events,
     query = Event.objects.filter().select_related('author')
     if data['types']:
         query = query.filter(type__in=data['types'])
@@ -247,9 +286,11 @@ def events(request):
     query = query.filter(visible=data['visible'])
     payload = []
     for event in query:
+        if not event._user_can_see_or_404(request.user):
+            continue
         terms = event.term_set.all().select_related('room')
         author = event.author
-        # TODO get author url, how to check if user is student or employee?
+        # TODO get author url
         author_url = ""
         payload.append({"emails": list(event.get_followers()),
                         "terms": [{"start": t.start,
@@ -273,12 +314,17 @@ def events(request):
 
 @csrf_exempt
 def delete_event(request, event_id):
-    Event.objects.get(pk=event_id).delete()
+    event = get_object_or_404(Event, pk=event_id)
+    # TODO: User.objects.get to request.user
+    if not request.user.has_perm('schedule.manage_events') and event.author != User.objects.get(first_name='M_74', last_name='B_74'):
+        raise ValidationError(
+            message={
+                'status': ['Nie można usuwać wydarzeń nie będąc ich autorem']},
+            code='permission')
+    event.delete()
     return HttpResponse("<html><body>Event deleted</body></html>", status=200)
 
 
-# TODO: normal user cannot see other people unaccepted events, he sees unaccepted self created events
-#  Admin can see others unaccepted events
 @csrf_exempt
 def event(request, event_id):
     if request.method == "POST":
@@ -288,7 +334,7 @@ def event(request, event_id):
     event = Event.get_event_or_404(event_id, request.user)
     terms = event.term_set.all().select_related('room')
     author = event.author
-    # TODO get author url, how to check if user is student or employee?
+    # TODO get author url
     author_url = ""
     return JsonResponse({"emails": list(event.get_followers()),
                          "terms": [{"start": t.start,
