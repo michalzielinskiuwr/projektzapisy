@@ -3,10 +3,9 @@ from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.db.models import Q
-from django.http import JsonResponse, Http404, HttpResponseBadRequest, HttpResponse
+from django.http import JsonResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
-from django.core.exceptions import PermissionDenied
 from django.core.validators import ValidationError
 from django.views.decorators.csrf import csrf_exempt
 
@@ -41,8 +40,7 @@ def session(request):
     return TemplateResponse(request, 'schedule/session.html', locals())
 
 
-# TODO check if events is enough to replace exams function
-# TODO make url, return similar data to /events/ ,but with rooms
+# TODO
 def exams(request):
     pass
 
@@ -149,14 +147,27 @@ def _check_and_prepare_post_payload(request):
                 raise TypeError
             term['start'] = datetime.strptime(term['start'], '%Y-%m-%dT%H:%M:%S.%fZ')
             term['end'] = datetime.strptime(term['end'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            if term['start'].date() != term['end'].date():
-                raise ValueError
-            if not any(k in term for k in ('room', 'place')):
-                raise KeyError
+            if term['start'].date() != term['end'].date() or term['start'] >= term['end']:
+                raise ValidationError(
+                    message={'end': ['Koniec musi następować po początku i być w tym samym dniu']},
+                    code='invalid'
+                )
+            if 'place' in term:
+                continue
+            room = get_object_or_404(Classroom, number=term['room'])
+            if not room.can_reserve:
+                raise ValidationError(
+                    message={'room': ['Ta sala nie jest przeznaczona do rezerwacji']},
+                    code='invalid'
+                )
+            term['room'] = room
         checked_payload['terms'] = terms
         return checked_payload
     except (ValueError, TypeError, KeyError):
-        raise Http404
+        raise ValidationError(
+            message='Przesłane dane są nieprawidłowe lub niewystarczające',
+            code='invalid'
+        )
 
 
 def _authorize_user_can_create_update_event(payload, user, event_author=None):
@@ -195,9 +206,8 @@ def _authorize_user_can_create_update_event(payload, user, event_author=None):
 
 
 # gets json, same structure like in GET
-# TODO return url to new event?
-# TODO: transaction atomic for creating Event and Terms
-# TODO: Is creating normal class events required? Ask how they are made for next semester
+# TODO return url to new event or json of new event or redirect to other url/page?
+# TODO: transaction atomic for creating Event and Terms, check in transaction after creating event for terms conflicts
 @csrf_exempt
 def create_event(request):
     payload = _check_and_prepare_post_payload(request)
@@ -206,7 +216,7 @@ def create_event(request):
     event = Event.objects.create(title=payload['title'], author=payload['author'], description=payload['description'],
                                  type=payload['type'], visible=payload['visible'], status=payload['status'])
     for term in payload['terms']:
-        room = Classroom.objects.get(number=term['room']) if 'room' in term else None
+        room = term['room'] if 'room' in term else None
         place = term['place'] if 'place' in term else None
         term = Term(event=event, day=term["start"].date(), start=term["start"].time(), end=term["end"].time())
         if room:
@@ -214,10 +224,10 @@ def create_event(request):
         else:
             term.place = place
         term.save()
-    # return HttpResponseBadRequest()
     return HttpResponse("<html><body>Event created</body></html>", status=201)
 
 
+# TODO: transaction atomic for updating Event and Terms, check in transaction after updating event for terms conflicts
 @csrf_exempt
 def update_event(request, event_id):
     payload = _check_and_prepare_post_payload(request)
@@ -235,8 +245,9 @@ def update_event(request, event_id):
         payload_term['matched'] = False
     for term in terms:
         matched = False
+        # Check if term from event before changes is in new term list, if found do nothing, delete otherwise
         for payload_term in payload['terms']:
-            if term.room and 'room' in payload_term and term.room.number != payload_term['room'] or\
+            if term.room and 'room' in payload_term and term.room != payload_term['room'] or\
                     term.place and 'place' in payload_term and term.place != payload_term['place']:
                 continue
             if not term.day == payload_term['start'].date():
@@ -248,9 +259,10 @@ def update_event(request, event_id):
             break
         if not matched:
             term.delete()
+    # If term from new term list is not matched with actual terms, create this term
     for payload_term in payload['terms']:
         if not payload_term['matched']:
-            room = Classroom.objects.get(number=payload_term['room']) if 'room' in payload_term else None
+            room = payload_term['room'] if 'room' in payload_term else None
             place = payload_term['place'] if 'place' in payload_term else None
             term = Term(event=event, day=payload_term["start"].date(), start=payload_term["start"].time(),
                         end=payload_term["end"].time())
