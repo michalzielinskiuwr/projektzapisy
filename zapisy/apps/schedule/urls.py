@@ -11,5 +11,6 @@ urlpatterns = [
     path('session/', views.session, name='session'),
     path('terms/', views.terms, name="terms"),
     path('events/', views.events, name="events"),
-    path('events/<int:event_id>/', views.event, name='show'),
+    path('events/<int:event_id>/', views.event, name='event'),
+    path('delete-event/<int:event_id>/', views.delete_event, name='delete'),
 ]
