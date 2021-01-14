@@ -16,12 +16,12 @@
     Wybierz daty, sale, jednostki oraz typ wydarzenia do wyświetlenia.
 </div>
 
-<form>
+<form style="margin-bottom: 10px;">
     <div class="form-row">
         <div class="form-group col-sm-3">
             {% regroup rooms by get_floor_display as floor_list %}
             <label for="room_selector">Wybierz sale:</label>
-            <select class="form-control" id="room_selector">
+            <select class="form-control" id="room_selector" multiple="multiple">
                 <option value="all" selected="selected">Wszystkie</option>
                 {% for floor in floor_list %}
                     <optgroup label="{{ floor.grouper }}">
@@ -64,10 +64,89 @@
             </div>
         </div>
     </div>
+
+    <button type="button" id="create_event_noselect" class="btn btn-success" data-toggle="modal" data-target="#create_event_modal">
+        Utwórz wydarzenie
+    </button>
+
+    <div class="modal fade" id="create_event_modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="create_event_title">Utwórz wydarzenie</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" action="create_event">
+                        <div class="form-group row">
+                            <div class="col">
+                                <label for="reservation_date">Dzień</label>
+                                <input type="date" id="reservation_date">
+                            </div>
+                            <div class="col">
+                                <label for="reservation_time_start">Początek</label>
+                                <input type="time" id="reservation_time_start" min="8:00" max="22:00" value="10:00">
+                            </div>
+                            <div class="col">
+                                <label for="reservation_time_end">Koniec</label>
+                                <input type="time" id="reservation_time_end" min="8:00" max="22:00" value="12:00">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="reservation_name">Nazwa wydarzenia</label>
+                            <input type="text" class="form-control" id="reservation_name" placeholder="Seminarium">
+                        </div>
+                        <div class="form-group">
+                            <label for="reservation_type">Rodzaj wydarzenia</label>
+                            <select class="form-control" id="reservation_type">
+                                <option value="type_event">Wydarzenie</option>
+                                <option value="type_exam">Egzamin</option>
+                                <option value="type_test">Kolokwium</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="reservation_visibility">Wydarzenie widoczne dla wszystkich użytkowników systemu:</label>
+                            <select class="form-control" id="reservation_visibility">
+                                <option value="visible">Tak</option>
+                                <option value="not_visible">Nie</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="reservation_description">Opis wydarzenia</label>
+                            <textarea class="form-control" id="reservation_description" rows="5"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="reservation_room">Miejsce wydarzenia</label>
+                            <select class="form-control" id="reservation_room">
+                                <option value="room_none">Miejsce poza Instytutem Informatyki</option>
+                                {% for floor in floor_list %}
+                                    <optgroup label="{{ floor.grouper }}">
+                                        {% for r in floor.list %}
+                                            <option value="{{ r.number }}">
+                                                {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
+                                            </option>
+                                        {% endfor %}
+                                    </optgroup>
+                                {% endfor %}
+                            </select>
+                            <div class="form-group" id="reservation_place_div">
+                                <input type="text" class="form-control" id="reservation_place" placeholder="Sala 13 w IM">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="create_event_dismiss">Anuluj</button>
+                    <button type="button" class="btn btn-success" id="create_event_button">Utwórz wydarzenie</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </form>
 
 {% render_bundle 'schedule-fullcalendar' %}
-<!-- todo calendar render and filters -->
 <div id='calendar'></div>
 
 {% endblock calendarview %}

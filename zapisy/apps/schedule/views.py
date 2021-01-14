@@ -1,17 +1,21 @@
 import json
 from datetime import datetime
+import time
 
 from django.contrib.auth.models import User
+from django.db import transaction, connection
 from django.db.models import Q
 from django.http import JsonResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
+from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.schedule.models.term import Term
 from apps.schedule.models.event import Event
 from apps.enrollment.courses.models.classroom import Classroom
+from apps.users.models import Student, is_employee
 
 
 def calendar(request):
@@ -82,7 +86,7 @@ def _check_and_prepare_get_data(request):
         raise Http404
 
 
-# TODO: Ask if 403 vs 500 response, ValidationError is 500, 403 == Forbidden
+# TODO: Ask if 403 vs 500 response, ValidationError is 500, 403 == Forbidden -- choose 400 errors, 500 will log it on slack and break server - huge error
 # Sends only required data for fullcalendar
 def terms(request):
     data = _check_and_prepare_get_data(request)
@@ -131,7 +135,7 @@ def _check_and_prepare_post_payload(request):
         checked_payload['title'] = str(payload.get('title', ''))
         checked_payload['description'] = str(payload.get('description', ''))
         checked_payload['visible'] = bool(payload.get('visible', True))
-        checked_payload['status'] = str(payload.get('status', Event.STATUS_PENDING))
+        checked_payload['status'] = str(payload.get('status', Event.STATUS_ACCEPTED))
         if not any(checked_payload['status'] == s for s, _ in Event.STATUSES):
             raise ValueError
         checked_payload['type'] = str(payload.get('type', Event.TYPE_GENERIC))
@@ -145,25 +149,37 @@ def _check_and_prepare_post_payload(request):
         for term in terms:
             if not isinstance(term, dict):
                 raise TypeError
-            term['start'] = datetime.strptime(term['start'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            term['end'] = datetime.strptime(term['end'], '%Y-%m-%dT%H:%M:%S.%fZ')
-            if term['start'].date() != term['end'].date() or term['start'] >= term['end']:
+            term['start'] = datetime.strptime(term['start'], '%H:%M').time()
+            term['end'] = datetime.strptime(term['end'], '%H:%M').time()
+            term['day'] = datetime.strptime(term['day'], '%Y-%m-%d').date()
+            if term['start'] >= term['end']:
                 raise ValidationError(
-                    message={'end': ['Koniec musi następować po początku i być w tym samym dniu']},
+                    message={'end': ['Koniec musi następować po początku']},
                     code='invalid'
                 )
-            if 'place' in term:
-                continue
-            room = get_object_or_404(Classroom, number=term['room'])
-            if not room.can_reserve:
-                raise ValidationError(
-                    message={'room': ['Ta sala nie jest przeznaczona do rezerwacji']},
-                    code='invalid'
-                )
-            term['room'] = room
+            if 'place' not in term and 'room' not in term:
+                raise KeyError
+            if 'room' in term and term['room']:
+                room = get_object_or_404(Classroom, number=term['room'])
+                if not room.can_reserve:
+                    raise ValidationError(
+                        message={'room': ['Ta sala nie jest przeznaczona do rezerwacji']},
+                        code='invalid'
+                    )
+                term['room'] = room
+            else:
+                term['room'] = None
+            # Only one of 'room' and 'place' can be set. One or both must be None.
+            if term['room'] or not isinstance(term['place'], str):
+                term['place'] = None
+            else:
+                term['place'] = term['place']
         checked_payload['terms'] = terms
         return checked_payload
     except (ValueError, TypeError, KeyError):
+        # PermissionDenied()
+        #  HttpResponseBadRequest
+        # HttpResponseForbidden
         raise ValidationError(
             message='Przesłane dane są nieprawidłowe lub niewystarczające',
             code='invalid'
@@ -216,24 +232,29 @@ def create_event(request):
     event = Event.objects.create(title=payload['title'], author=payload['author'], description=payload['description'],
                                  type=payload['type'], visible=payload['visible'], status=payload['status'])
     for term in payload['terms']:
-        room = term['room'] if 'room' in term else None
-        place = term['place'] if 'place' in term else None
-        term = Term(event=event, day=term["start"].date(), start=term["start"].time(), end=term["end"].time())
-        if room:
-            term.room = room
-        else:
-            term.place = place
-        term.save()
+        Term.objects.create(event=event, day=term["day"], start=term["start"],
+                            end=term["end"], room=term["room"], place=term["place"])
     return HttpResponse("<html><body>Event created</body></html>", status=201)
 
 
 # TODO: transaction atomic for updating Event and Terms, check in transaction after updating event for terms conflicts
 @csrf_exempt
+@transaction.atomic
 def update_event(request, event_id):
+    # .select_for_update()  -- beter than 'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE', same functionality.
+    # It blocks writing but allows reading. Blocks only specific rows in database, not whole table
+    # cursor = connection.cursor()
+    # cursor.execute('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE')
+
+    # time.sleep(6)
+
     payload = _check_and_prepare_post_payload(request)
+    # TODO read about it
+    # event = get_object_or_404(Event, pk=event_id).select_for_update()
     event = get_object_or_404(Event, pk=event_id)
     # TODO: User.objects.get to request.user
-    _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'), event_author=event.author)
+    _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'),
+                                            event_author=event.author)
     event.title = payload['title']
     event.description = payload['description']
     event.type = payload['type']
@@ -247,12 +268,11 @@ def update_event(request, event_id):
         matched = False
         # Check if term from event before changes is in new term list, if found do nothing, delete otherwise
         for payload_term in payload['terms']:
-            if term.room and 'room' in payload_term and term.room != payload_term['room'] or\
-                    term.place and 'place' in payload_term and term.place != payload_term['place']:
+            if term.room is not payload_term['room'] or term.place != payload_term['place']:
                 continue
-            if not term.day == payload_term['start'].date():
+            if term.day != payload_term['day']:
                 continue
-            if not term.start == payload_term['start'].time() or not term.end == payload_term['end'].time():
+            if term.start != payload_term['start'] or term.end != payload_term['end']:
                 continue
             matched = True
             payload_term['matched'] = True
@@ -262,15 +282,8 @@ def update_event(request, event_id):
     # If term from new term list is not matched with actual terms, create this term
     for payload_term in payload['terms']:
         if not payload_term['matched']:
-            room = payload_term['room'] if 'room' in payload_term else None
-            place = payload_term['place'] if 'place' in payload_term else None
-            term = Term(event=event, day=payload_term["start"].date(), start=payload_term["start"].time(),
-                        end=payload_term["end"].time())
-            if room:
-                term.room = room
-            else:
-                term.place = place
-            term.save()
+            Term.objects.create(event=event, day=payload_term["day"], start=payload_term["start"],
+                                end=payload_term["end"], room=payload_term["room"], place=payload_term["place"])
     return HttpResponse("<html><body>Event updated</body></html>", status=200)
 
 
@@ -302,19 +315,22 @@ def events(request):
             continue
         terms = event.term_set.all().select_related('room')
         author = event.author
-        # TODO get author url
-        author_url = ""
+        if is_employee(author):
+            author_url = reverse('employee-profile', args=[author.pk])
+        else:
+            author_url = reverse('student-profile', args=[author.pk])
+            student = Student.objects.get(user=author)
+            if not student.consent_granted():
+                author = None
+                author_url = None
         payload.append({"emails": list(event.get_followers()),
                         "terms": [{"start": t.start,
                                    "end": t.end,
-                                   "day:": t.day,
+                                   "day": t.day,
                                    "room": t.room.number if t.room else None,
-                                   # TODO fix this to show proper url, not just /classrooms/ (main callendar without room filtering)
-                                   # TODO look into room model implementation for TODO there
-                                   "room_url": t.room.get_absolute_url() if t.room else None,
                                    "place": t.place} for t in terms],
                         "description": event.description,
-                        "author": author.get_full_name(),
+                        "author": author.get_full_name() if author else None,
                         "author_url": author_url,
                         "title": event.title,
                         "status": event.status,
@@ -328,7 +344,8 @@ def events(request):
 def delete_event(request, event_id):
     event = get_object_or_404(Event, pk=event_id)
     # TODO: User.objects.get to request.user
-    if not request.user.has_perm('schedule.manage_events') and event.author != User.objects.get(first_name='M_74', last_name='B_74'):
+    if not request.user.has_perm('schedule.manage_events') and event.author != User.objects.get(first_name='M_74',
+                                                                                                last_name='B_74'):
         raise ValidationError(
             message={
                 'status': ['Nie można usuwać wydarzeń nie będąc ich autorem']},
@@ -337,28 +354,30 @@ def delete_event(request, event_id):
     return HttpResponse("<html><body>Event deleted</body></html>", status=200)
 
 
+# TODO check if hidden students are visible to employees and admin
 @csrf_exempt
 def event(request, event_id):
     if request.method == "POST":
         return update_event(request, event_id)
-    if request.method == "DELETE":
-        return delete_event(request, event_id)
     event = Event.get_event_or_404(event_id, request.user)
     terms = event.term_set.all().select_related('room')
     author = event.author
-    # TODO get author url
-    author_url = ""
+    if is_employee(author):
+        author_url = reverse('employee-profile', args=[author.pk])
+    else:
+        author_url = reverse('student-profile', args=[author.pk])
+        student = Student.objects.get(user=author)
+        if not student.consent_granted():
+            author = None
+            author_url = None
     return JsonResponse({"emails": list(event.get_followers()),
                          "terms": [{"start": t.start,
                                     "end": t.end,
-                                    "day:": t.day,
+                                    "day": t.day,
                                     "room": t.room.number if t.room else None,
-                                    # TODO fix this to show proper url, not just /classrooms/ (main callendar without room filtering)
-                                    # TODO look into room model implementation for TODO there
-                                    "room_url": t.room.get_absolute_url() if t.room else None,
                                     "place": t.place} for t in terms],
                          "description": event.description,
-                         "author": author.get_full_name(),
+                         "author": author.get_full_name() if author else None,
                          "author_url": author_url,
                          "title": event.title,
                          "status": event.status,
