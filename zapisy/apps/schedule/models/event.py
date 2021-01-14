@@ -17,6 +17,7 @@ class Event(models.Model):
     TYPE_GENERIC = '2'
     TYPE_CLASS = '3'
     TYPE_OTHER = '4'
+    TYPE_SPECIAL_RESERVATION = '5'
 
     STATUS_PENDING = '0'
     STATUS_ACCEPTED = '1'
@@ -30,6 +31,7 @@ class Event(models.Model):
              (TYPE_TEST, 'Kolokwium'),
              (TYPE_GENERIC, 'Wydarzenie'),
              (TYPE_CLASS, 'Zajęcia'),
+             (TYPE_SPECIAL_RESERVATION, 'Rezerwacja stała'),
              (TYPE_OTHER, 'Inne')]
 
     TYPES_FOR_STUDENT = [(TYPE_GENERIC, 'Wydarzenie')]
