@@ -15,6 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from apps.schedule.models.term import Term
 from apps.schedule.models.event import Event
 from apps.enrollment.courses.models.classroom import Classroom
+from apps.users.models import Student, is_employee
 
 
 def calendar(request):
@@ -134,7 +135,7 @@ def _check_and_prepare_post_payload(request):
         checked_payload['title'] = str(payload.get('title', ''))
         checked_payload['description'] = str(payload.get('description', ''))
         checked_payload['visible'] = bool(payload.get('visible', True))
-        checked_payload['status'] = str(payload.get('status', Event.STATUS_PENDING))
+        checked_payload['status'] = str(payload.get('status', Event.STATUS_ACCEPTED))
         if not any(checked_payload['status'] == s for s, _ in Event.STATUSES):
             raise ValueError
         checked_payload['type'] = str(payload.get('type', Event.TYPE_GENERIC))
@@ -148,8 +149,8 @@ def _check_and_prepare_post_payload(request):
         for term in terms:
             if not isinstance(term, dict):
                 raise TypeError
-            term['start'] = datetime.strptime(term['start'], '%H:%M:%S').time()
-            term['end'] = datetime.strptime(term['end'], '%H:%M:%S').time()
+            term['start'] = datetime.strptime(term['start'], '%H:%M').time()
+            term['end'] = datetime.strptime(term['end'], '%H:%M').time()
             term['day'] = datetime.strptime(term['day'], '%Y-%m-%d').date()
             if term['start'] >= term['end']:
                 raise ValidationError(
@@ -314,8 +315,14 @@ def events(request):
             continue
         terms = event.term_set.all().select_related('room')
         author = event.author
-        # TODO get author url
-        author_url = ""
+        if is_employee(author):
+            author_url = reverse('employee-profile', args=[author.pk])
+        else:
+            author_url = reverse('student-profile', args=[author.pk])
+            student = Student.objects.get(user=author)
+            if not student.consent_granted():
+                author = None
+                author_url = None
         payload.append({"emails": list(event.get_followers()),
                         "terms": [{"start": t.start,
                                    "end": t.end,
@@ -323,7 +330,7 @@ def events(request):
                                    "room": t.room.number if t.room else None,
                                    "place": t.place} for t in terms],
                         "description": event.description,
-                        "author": author.get_full_name(),
+                        "author": author.get_full_name() if author else None,
                         "author_url": author_url,
                         "title": event.title,
                         "status": event.status,
@@ -347,6 +354,7 @@ def delete_event(request, event_id):
     return HttpResponse("<html><body>Event deleted</body></html>", status=200)
 
 
+# TODO check if hidden students are visible to employees and admin
 @csrf_exempt
 def event(request, event_id):
     if request.method == "POST":
@@ -354,11 +362,14 @@ def event(request, event_id):
     event = Event.get_event_or_404(event_id, request.user)
     terms = event.term_set.all().select_related('room')
     author = event.author
-    author_url = ""
-    if request.user.student:
-        author_url = reverse('student-profile', args=[request.user.pk])
-    if request.user.employee:
-        author_url = reverse('employee-profile', args=[request.user.pk])
+    if is_employee(author):
+        author_url = reverse('employee-profile', args=[author.pk])
+    else:
+        author_url = reverse('student-profile', args=[author.pk])
+        student = Student.objects.get(user=author)
+        if not student.consent_granted():
+            author = None
+            author_url = None
     return JsonResponse({"emails": list(event.get_followers()),
                          "terms": [{"start": t.start,
                                     "end": t.end,
@@ -366,7 +377,7 @@ def event(request, event_id):
                                     "room": t.room.number if t.room else None,
                                     "place": t.place} for t in terms],
                          "description": event.description,
-                         "author": author.get_full_name(),
+                         "author": author.get_full_name() if author else None,
                          "author_url": author_url,
                          "title": event.title,
                          "status": event.status,
