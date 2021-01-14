@@ -49,7 +49,10 @@ function create_event(timeRange) {
         var type;
         var startTime = new Date($('#reservation_date').val() + "T" + $('#reservation_time_start').val() + "Z").toISOString();
         var endTime = new Date($('#reservation_date').val() + "T" + $('#reservation_time_end').val() + "Z").toISOString();
-
+        var day = $('#reservation_date').val();
+        var start = $('#reservation_time_start').val();
+        var end = $('#reservation_time_end').val();
+        
         switch ($('#reservation_type').val()) {
             case "type_event":
                 type = "2";
@@ -69,8 +72,9 @@ function create_event(timeRange) {
             "type": type,
             "terms": [
                 {
-                    "start": startTime,
-                    "end": endTime,
+                    "day": day,
+                    "start": start,
+                    "end": end,
                 },
             ]
         };
@@ -86,7 +90,8 @@ function create_event(timeRange) {
         var fullCalendarData = {
             title: name,
             start: startTime,
-            end: endTime
+            end: endTime,
+            color: "green"
         }
         calendar.addEvent(fullCalendarData);
 
