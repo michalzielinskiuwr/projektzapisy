@@ -1,3 +1,4 @@
+import copy
 import json
 from datetime import datetime
 
@@ -107,6 +108,7 @@ def terms(request):
 
 def _check_and_prepare_post_payload(request):
     """Check if payload has proper keys nad values for creating and updating events"""
+    """Return tuple (True, None) if user can create or update event. Return (False, HttpResponseForbidden) otherwise"""
     payload = json.loads(request.body)
     checked_payload = {}
     # TODO: change author to request.user
@@ -122,64 +124,62 @@ def _check_and_prepare_post_payload(request):
         checked_payload['type'] = str(payload.get('type', Event.TYPE_GENERIC))
         if not any(checked_payload['type'] == t for t, _ in Event.TYPES):
             raise ValueError
-        terms = payload.get('terms', [])
-        if not isinstance(terms, list):
+        payload_terms = payload.get('terms', [])
+        if not isinstance(payload_terms, list):
             raise TypeError
-        if not terms:
+        if not payload_terms:
             raise ValueError
+        terms = []
         # TODO use clean method from model
-        for term in terms:
-            if not isinstance(term, dict):
+        for payload_term in payload_terms:
+            if not isinstance(payload_term, dict):
                 raise TypeError
-            term['start'] = datetime.strptime(term['start'], '%H:%M').time()
-            term['end'] = datetime.strptime(term['end'], '%H:%M').time()
-            term['day'] = datetime.strptime(term['day'], '%Y-%m-%d').date()
-            if term['start'] >= term['end']:
-                raise ValidationError(
-                    message={'end': ['Koniec musi następować po początku']},
-                    code='invalid'
-                )
-            if 'place' not in term and 'room' not in term:
+            term = dict()
+            term['start'] = datetime.strptime(payload_term['start'], '%H:%M').time()
+            term['end'] = datetime.strptime(payload_term['end'], '%H:%M').time()
+            term['day'] = datetime.strptime(payload_term['day'], '%Y-%m-%d').date()
+            if payload_term['start'] >= payload_term['end']:
+                raise ValidationError('Koniec musi następować po początku')
+            if 'place' not in payload_term and 'rooms' not in payload_term:
                 raise KeyError
-            if 'room' in term and term['room']:
-                room = get_object_or_404(Classroom, number=term['room'])
-                if not room.can_reserve:
-                    raise ValidationError(
-                        message={'room': ['Ta sala nie jest przeznaczona do rezerwacji']},
-                        code='invalid'
-                    )
-                term['room'] = room
+            if 'rooms' in payload_term and payload_term['rooms'] and isinstance(payload_term['rooms'], list):
+                for room_number in payload_term['rooms']:
+                    room = get_object_or_404(Classroom, number=room_number)
+                    if not room.can_reserve:
+                        raise ValidationError('Ta sala nie jest przeznaczona do rezerwacji')
+                    term['room'] = room
+                    term['place'] = None
+                    terms.append(term)
+                    term = copy.deepcopy(term)
+            # Only one of 'room' and 'place' can be set.
             else:
                 term['room'] = None
-            # Only one of 'room' and 'place' can be set. One or both must be None.
-            if term['room'] or not isinstance(term['place'], str):
-                term['place'] = None
-            else:
-                term['place'] = term['place']
+                if not isinstance(payload_term['place'], str):
+                    raise ValueError
+                term['place'] = payload_term['place']
+                terms.append(term)
         checked_payload['terms'] = terms
         return checked_payload
     except (ValueError, TypeError, KeyError):
-        return HttpResponseBadRequest('Przesłane dane są nieprawidłowe lub niewystarczające')
+        raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
 
 
 def _authorize_user_can_create_update_event(payload, user, event_author=None):
-    """Return tuple (True, None) if user can create or update event. Return (False, HttpResponseForbidden) otherwise"""
     if user.has_perm('schedule.manage_events'):
-        return True, None
+        return
     if payload['author'] != user or (event_author and event_author != user):
-        return False, HttpResponseForbidden('Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem')
+        raise ValidationError('Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem')
     if user.student:
         if payload['type'] != Event.TYPE_GENERIC:
-            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać wydarzenia tego typu')
+            raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
         if payload['status'] != Event.STATUS_PENDING:
-            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
+            raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
     # Employee can create accepted exam and test events
     if user.employee:
         if payload['type'] not in Event.TYPES_FOR_TEACHER:
-            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać wydarzenia tego typu')
+            raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
         if payload['type'] == Event.TYPE_GENERIC and payload['status'] != Event.STATUS_PENDING:
-            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
-    return True, None
+            raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
 
 
 def _get_event_author_url(author):
@@ -195,7 +195,10 @@ def _get_event_author_url(author):
 # Return list of conflicting terms without own terms
 @csrf_exempt
 def check_conflicts(request):
-    payload = _check_and_prepare_post_payload(request)
+    try:
+        payload = _check_and_prepare_post_payload(request)
+    except ValidationError as err:
+        return HttpResponseBadRequest(err)
     terms_conflicts = set()
     with transaction.atomic():
         event = Event.objects.create(title=payload['title'], author=payload['author'],
@@ -229,13 +232,15 @@ def check_conflicts(request):
 @csrf_exempt
 @transaction.atomic
 def create_event(request):
-    payload = _check_and_prepare_post_payload(request)
-    # TODO: User.objects.get to request.user
-    authorized, http_response_forbidden = _authorize_user_can_create_update_event(payload,
-                                                                                  User.objects.get(first_name='M_74',
-                                                                                                   last_name='B_74'))
-    if not authorized:
-        return http_response_forbidden
+    try:
+        payload = _check_and_prepare_post_payload(request)
+    except ValidationError as err:
+        return HttpResponseBadRequest(err)
+    try:
+        # TODO: User.objects.get to request.user
+        _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'))
+    except ValidationError as err:
+        return HttpResponseForbidden(err)
     event = Event.objects.create(title=payload['title'], author=payload['author'], description=payload['description'],
                                  type=payload['type'], visible=payload['visible'], status=payload['status'])
     for term in payload['terms']:
@@ -284,15 +289,17 @@ def create_event(request):
 @csrf_exempt
 @transaction.atomic
 def update_event(request, event_id):
-    payload = _check_and_prepare_post_payload(request)
+    try:
+        payload = _check_and_prepare_post_payload(request)
+    except ValidationError as err:
+        return HttpResponseBadRequest(err)
     event = get_object_or_404(Event, pk=event_id)
-    # TODO: User.objects.get to request.user
-    authorized, http_response_forbidden = _authorize_user_can_create_update_event(payload,
-                                                                                  User.objects.get(first_name='M_74',
-                                                                                                   last_name='B_74'),
-                                                                                  event_author=event.author)
-    if not authorized:
-        return http_response_forbidden
+    try:
+        # TODO: User.objects.get to request.user
+        _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'),
+                                                event_author=event.author)
+    except ValidationError as err:
+        return HttpResponseForbidden(err)
     event.title = payload['title']
     event.description = payload['description']
     event.type = payload['type']
@@ -362,8 +369,25 @@ def update_event(request, event_id):
                          "url": event.get_absolute_url()}, status=201)
 
 
-# TODO: time filtering or semester filtering. Add sorting by created or edited date if necessary
-# TODO: event pagination, so client can get only necessary events for current page
+def _group_terms_same_room(terms):
+    new_terms = []
+    for term in terms:
+        insert_to_new_terms = True
+        for new_term in new_terms:
+            if term.start == new_term["start"] and term.end == new_term["end"] and term.day == new_term["day"] \
+                    and term.place is None and new_term["place"] is None:
+                new_term["rooms"].append(term.room.number)
+                insert_to_new_terms = False
+                break
+        if insert_to_new_terms:
+            new_terms.append({"start": term.start,
+                              "end": term.end,
+                              "day": term.day,
+                              "rooms": [term.room.number] if term.room else None,
+                              "place": term.place})
+    return new_terms
+
+
 @csrf_exempt
 def events(request):
     if request.method == "POST":
@@ -399,11 +423,7 @@ def events(request):
                 author = None
                 author_url = None
         payload.append({"emails": list(event.get_followers()),
-                        "terms": [{"start": t.start,
-                                   "end": t.end,
-                                   "day": t.day,
-                                   "room": t.room.number if t.room else None,
-                                   "place": t.place} for t in terms],
+                        "terms": _group_terms_same_room(terms),
                         "description": event.description,
                         "author": author.get_full_name() if author else None,
                         "author_url": author_url,
@@ -442,11 +462,7 @@ def event(request, event_id):
             author = None
             author_url = None
     return JsonResponse({"emails": list(event.get_followers()),
-                         "terms": [{"start": t.start,
-                                    "end": t.end,
-                                    "day": t.day,
-                                    "room": t.room.number if t.room else None,
-                                    "place": t.place} for t in terms],
+                         "terms": _group_terms_same_room(terms),
                          "description": event.description,
                          "author": author.get_full_name() if author else None,
                          "author_url": author_url,
@@ -454,4 +470,4 @@ def event(request, event_id):
                          "status": event.status,
                          "type": event.type,
                          "visible": event.visible,
-                         "url": event.get_absolute_url(), })
+                         "url": event.get_absolute_url()})
