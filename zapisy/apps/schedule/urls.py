@@ -4,13 +4,10 @@ from . import views
 
 urlpatterns = [
     path('', views.calendar, name='calendar'),
-    path('calendar-admin/', views.calendar_admin, name='calendar-admin'),
-    path('history/', views.history, name='history'),
     path('report/', views.report, name='report'),
-    path('reservation/', views.reservation, name='reservation'),
-    path('session/', views.session, name='session'),
     path('terms/', views.terms, name="terms"),
     path('events/', views.events, name="events"),
     path('events/<int:event_id>/', views.event, name='event'),
     path('delete-event/<int:event_id>/', views.delete_event, name='delete'),
+    path('check-conflicts/', views.check_conflicts, name='check-conflicts'),
 ]

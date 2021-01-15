@@ -1,11 +1,10 @@
 import json
 from datetime import datetime
-import time
 
 from django.contrib.auth.models import User
-from django.db import transaction, connection
+from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, Http404, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404
 from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
@@ -24,29 +23,8 @@ def calendar(request):
     return TemplateResponse(request, 'schedule/calendar.html', locals())
 
 
-def calendar_admin(request):
-    return TemplateResponse(request, 'schedule/calendar_admin.html', locals())
-
-
-def history(request):
-    return TemplateResponse(request, 'schedule/history.html', locals())
-
-
 def report(request):
     return TemplateResponse(request, 'schedule/report.html', locals())
-
-
-def reservation(request):
-    return TemplateResponse(request, 'schedule/reservation.html', locals())
-
-
-def session(request):
-    return TemplateResponse(request, 'schedule/session.html', locals())
-
-
-# TODO
-def exams(request):
-    pass
 
 
 def _check_and_prepare_get_data(request):
@@ -83,10 +61,11 @@ def _check_and_prepare_get_data(request):
         data['rooms'] = rooms
         return data
     except (ValueError, TypeError):
-        raise Http404
+        return HttpResponseBadRequest('Przesłane dane są nieprawidłowe lub niewystarczające')
 
 
 # TODO: Ask if 403 vs 500 response, ValidationError is 500, 403 == Forbidden -- choose 400 errors, 500 will log it on slack and break server - huge error
+# TODO: json payload - check if logged user is author
 # Sends only required data for fullcalendar
 def terms(request):
     data = _check_and_prepare_get_data(request)
@@ -120,6 +99,7 @@ def terms(request):
                         "type": event.type,
                         "visible": event.visible,
                         "url": event.get_absolute_url(),
+                        "user_is_author": False,
                         "start": datetime.combine(term.day, term.start).isoformat(),
                         "end": datetime.combine(term.day, term.end).isoformat()})
     return JsonResponse(payload, safe=False)
@@ -135,6 +115,7 @@ def _check_and_prepare_post_payload(request):
         checked_payload['title'] = str(payload.get('title', ''))
         checked_payload['description'] = str(payload.get('description', ''))
         checked_payload['visible'] = bool(payload.get('visible', True))
+        # TODO change to Event.STATUS_PENDING
         checked_payload['status'] = str(payload.get('status', Event.STATUS_ACCEPTED))
         if not any(checked_payload['status'] == s for s, _ in Event.STATUSES):
             raise ValueError
@@ -146,6 +127,7 @@ def _check_and_prepare_post_payload(request):
             raise TypeError
         if not terms:
             raise ValueError
+        # TODO use clean method from model
         for term in terms:
             if not isinstance(term, dict):
                 raise TypeError
@@ -177,93 +159,149 @@ def _check_and_prepare_post_payload(request):
         checked_payload['terms'] = terms
         return checked_payload
     except (ValueError, TypeError, KeyError):
-        # PermissionDenied()
-        #  HttpResponseBadRequest
-        # HttpResponseForbidden
-        raise ValidationError(
-            message='Przesłane dane są nieprawidłowe lub niewystarczające',
-            code='invalid'
-        )
+        return HttpResponseBadRequest('Przesłane dane są nieprawidłowe lub niewystarczające')
 
 
 def _authorize_user_can_create_update_event(payload, user, event_author=None):
-    """Return True if user can create or update event. Raise ValidationError otherwise"""
+    """Return tuple (True, None) if user can create or update event. Return (False, HttpResponseForbidden) otherwise"""
     if user.has_perm('schedule.manage_events'):
-        return True
+        return True, None
     if payload['author'] != user or (event_author and event_author != user):
-        raise ValidationError(
-            message={
-                'status': ['Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem']},
-            code='permission')
+        return False, HttpResponseForbidden('Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem')
     if user.student:
         if payload['type'] != Event.TYPE_GENERIC:
-            raise ValidationError(
-                message={
-                    'status': ['Nie masz uprawnień aby dodawać wydarzenia tego typu']},
-                code='permission')
+            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać wydarzenia tego typu')
         if payload['status'] != Event.STATUS_PENDING:
-            raise ValidationError(
-                message={
-                    'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia']},
-                code='permission')
+            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
     # Employee can create accepted exam and test events
     if user.employee:
         if payload['type'] not in Event.TYPES_FOR_TEACHER:
-            raise ValidationError(
-                message={
-                    'status': ['Nie masz uprawnień aby dodawać wydarzenia tego typu']},
-                code='permission')
+            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać wydarzenia tego typu')
         if payload['type'] == Event.TYPE_GENERIC and payload['status'] != Event.STATUS_PENDING:
-            raise ValidationError(
-                message={
-                    'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia']},
-                code='permission')
-    return True
+            return False, HttpResponseForbidden('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
+    return True, None
+
+
+def _get_event_author_url(author):
+    if not author:
+        return ""
+    if is_employee(author):
+        author_url = reverse('employee-profile', args=[author.pk])
+    else:
+        author_url = reverse('student-profile', args=[author.pk])
+    return author_url
+
+
+# Return list of conflicting terms without own terms
+@csrf_exempt
+def check_conflicts(request):
+    payload = _check_and_prepare_post_payload(request)
+    terms_conflicts = set()
+    with transaction.atomic():
+        event = Event.objects.create(title=payload['title'], author=payload['author'],
+                                     description=payload['description'],
+                                     type=payload['type'], visible=payload['visible'], status=payload['status'])
+        for term in payload['terms']:
+            term_conflicts = Term.objects.create(event=event, day=term["day"], start=term["start"], end=term["end"],
+                                                 room=term["room"], place=term["place"]).get_conflicted()
+            for conflict in term_conflicts:
+                terms_conflicts.add(conflict)
+        transaction.set_rollback(True)
+    payload = []
+    for term in terms_conflicts:
+        payload.append({"title": term.event.title,
+                        "description": term.event.description,
+                        "author": term.event.author.get_full_name() if event.author else None,
+                        "author_url": _get_event_author_url(term.event.author),
+                        "status": term.event.status,
+                        "type": term.event.type,
+                        "visible": term.event.visible,
+                        "url": term.event.get_absolute_url(),
+                        "start": term.start,
+                        "end": term.end,
+                        "day": term.day,
+                        "room": term.room.number if term.room else None,
+                        "place": term.place})
+    return JsonResponse(payload, safe=False)
 
 
 # gets json, same structure like in GET
-# TODO return url to new event or json of new event or redirect to other url/page?
-# TODO: transaction atomic for creating Event and Terms, check in transaction after creating event for terms conflicts
 @csrf_exempt
+@transaction.atomic
 def create_event(request):
     payload = _check_and_prepare_post_payload(request)
     # TODO: User.objects.get to request.user
-    _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'))
+    authorized, http_response_forbidden = _authorize_user_can_create_update_event(payload,
+                                                                                  User.objects.get(first_name='M_74',
+                                                                                                   last_name='B_74'))
+    if not authorized:
+        return http_response_forbidden
     event = Event.objects.create(title=payload['title'], author=payload['author'], description=payload['description'],
                                  type=payload['type'], visible=payload['visible'], status=payload['status'])
     for term in payload['terms']:
         Term.objects.create(event=event, day=term["day"], start=term["start"],
                             end=term["end"], room=term["room"], place=term["place"])
-    return HttpResponse("<html><body>Event created</body></html>", status=201)
+    terms = event.term_set.all().select_related('room')
+    if event.get_conflicted():
+        terms_conflicts = set()
+        for term in terms:
+            term_conflicts = term.get_conflicted()
+            for conflict in term_conflicts:
+                terms_conflicts.add(conflict)
+        payload = []
+        for term in terms_conflicts:
+            payload.append({"title": term.event.title,
+                            "description": term.event.description,
+                            "author": term.event.author.get_full_name() if event.author else None,
+                            "author_url": _get_event_author_url(term.event.author),
+                            "status": term.event.status,
+                            "type": term.event.type,
+                            "visible": term.event.visible,
+                            "url": term.event.get_absolute_url(),
+                            "start": term.start,
+                            "end": term.end,
+                            "day": term.day,
+                            "room": term.room.number if term.room else None,
+                            "place": term.place})
+        transaction.set_rollback(True)
+        return JsonResponse(payload, safe=False, status=400)
+    return JsonResponse({"emails": list(event.get_followers()),
+                         "terms": [{"start": t.start,
+                                    "end": t.end,
+                                    "day": t.day,
+                                    "room": t.room.number if t.room else None,
+                                    "place": t.place} for t in terms],
+                         "description": event.description,
+                         "author": event.author.get_full_name() if event.author else None,
+                         "author_url": _get_event_author_url(event.author),
+                         "title": event.title,
+                         "status": event.status,
+                         "type": event.type,
+                         "visible": event.visible,
+                         "url": event.get_absolute_url()}, status=201)
 
 
-# TODO: transaction atomic for updating Event and Terms, check in transaction after updating event for terms conflicts
 @csrf_exempt
 @transaction.atomic
 def update_event(request, event_id):
-    # .select_for_update()  -- beter than 'SET TRANSACTION ISOLATION LEVEL SERIALIZABLE', same functionality.
-    # It blocks writing but allows reading. Blocks only specific rows in database, not whole table
-    # cursor = connection.cursor()
-    # cursor.execute('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE')
-
-    # time.sleep(6)
-
     payload = _check_and_prepare_post_payload(request)
-    # TODO read about it
-    # event = get_object_or_404(Event, pk=event_id).select_for_update()
     event = get_object_or_404(Event, pk=event_id)
     # TODO: User.objects.get to request.user
-    _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'),
-                                            event_author=event.author)
+    authorized, http_response_forbidden = _authorize_user_can_create_update_event(payload,
+                                                                                  User.objects.get(first_name='M_74',
+                                                                                                   last_name='B_74'),
+                                                                                  event_author=event.author)
+    if not authorized:
+        return http_response_forbidden
     event.title = payload['title']
     event.description = payload['description']
     event.type = payload['type']
     event.visible = payload['visible']
     event.status = payload['status']
     event.save()
-    terms = event.term_set.all().select_related('room')
     for payload_term in payload['terms']:
         payload_term['matched'] = False
+    terms = event.term_set.all().select_related('room')
     for term in terms:
         matched = False
         # Check if term from event before changes is in new term list, if found do nothing, delete otherwise
@@ -284,7 +322,44 @@ def update_event(request, event_id):
         if not payload_term['matched']:
             Term.objects.create(event=event, day=payload_term["day"], start=payload_term["start"],
                                 end=payload_term["end"], room=payload_term["room"], place=payload_term["place"])
-    return HttpResponse("<html><body>Event updated</body></html>", status=200)
+    terms = event.term_set.all().select_related('room')
+    if event.get_conflicted():
+        terms_conflicts = set()
+        for term in terms:
+            term_conflicts = term.get_conflicted()
+            for conflict in term_conflicts:
+                terms_conflicts.add(conflict)
+        payload = []
+        for term in terms_conflicts:
+            payload.append({"title": term.event.title,
+                            "description": term.event.description,
+                            "author": term.event.author.get_full_name() if event.author else None,
+                            "author_url": _get_event_author_url(term.event.author),
+                            "status": term.event.status,
+                            "type": term.event.type,
+                            "visible": term.event.visible,
+                            "url": term.event.get_absolute_url(),
+                            "start": term.start,
+                            "end": term.end,
+                            "day": term.day,
+                            "room": term.room.number if term.room else None,
+                            "place": term.place})
+        transaction.set_rollback(True)
+        return JsonResponse(payload, safe=False, status=400)
+    return JsonResponse({"emails": list(event.get_followers()),
+                         "terms": [{"start": t.start,
+                                    "end": t.end,
+                                    "day": t.day,
+                                    "room": t.room.number if t.room else None,
+                                    "place": t.place} for t in terms],
+                         "description": event.description,
+                         "author": event.author.get_full_name() if event.author else None,
+                         "author_url": _get_event_author_url(event.author),
+                         "title": event.title,
+                         "status": event.status,
+                         "type": event.type,
+                         "visible": event.visible,
+                         "url": event.get_absolute_url()}, status=201)
 
 
 # TODO: time filtering or semester filtering. Add sorting by created or edited date if necessary
@@ -320,7 +395,7 @@ def events(request):
         else:
             author_url = reverse('student-profile', args=[author.pk])
             student = Student.objects.get(user=author)
-            if not student.consent_granted():
+            if not student.consent_granted() and not request.user.employee:
                 author = None
                 author_url = None
         payload.append({"emails": list(event.get_followers()),
@@ -346,15 +421,11 @@ def delete_event(request, event_id):
     # TODO: User.objects.get to request.user
     if not request.user.has_perm('schedule.manage_events') and event.author != User.objects.get(first_name='M_74',
                                                                                                 last_name='B_74'):
-        raise ValidationError(
-            message={
-                'status': ['Nie można usuwać wydarzeń nie będąc ich autorem']},
-            code='permission')
+        return HttpResponseForbidden('Nie można usuwać wydarzeń nie będąc ich autorem')
     event.delete()
-    return HttpResponse("<html><body>Event deleted</body></html>", status=200)
+    return HttpResponse("Event deleted", status=200)
 
 
-# TODO check if hidden students are visible to employees and admin
 @csrf_exempt
 def event(request, event_id):
     if request.method == "POST":
@@ -367,7 +438,7 @@ def event(request, event_id):
     else:
         author_url = reverse('student-profile', args=[author.pk])
         student = Student.objects.get(user=author)
-        if not student.consent_granted():
+        if not student.consent_granted() and not request.user.employee:
             author = None
             author_url = None
     return JsonResponse({"emails": list(event.get_followers()),

@@ -6,23 +6,7 @@
 
 {% block system_menu %}
     <li {% block schedule_calendar %}{% endblock %}>
-        <a class="nav-link" href="{% url 'schedule:calendar' %}">Sale + Wydarzenia</a>
-    </li>
-
-    <li {% block schedule_session %}{% endblock %}>
-        <a class="nav-link" href="{% url 'schedule:session' %}">Egzaminy</a>
-    </li>
-
-    <li {% block schedule_reservation %}{% endblock %}>
-        <a class="nav-link" href="{% url 'schedule:reservation' %}">Rezerwuj</a>
-    </li>
-
-    <li {% block schedule_calendar_admin %}{% endblock %}>
-        <a class="nav-link" href="{% url 'schedule:calendar-admin' %}">Zarządzaj + Konflikty</a>
-    </li>
-
-    <li {% block schedule_history %}{% endblock %}>
-        <a class="nav-link" href="{% url 'schedule:history' %}">Historia</a>
+        <a class="nav-link" href="{% url 'schedule:calendar' %}">Kalendarz</a>
     </li>
 
     <li {% block schedule_report %}{% endblock %}>
