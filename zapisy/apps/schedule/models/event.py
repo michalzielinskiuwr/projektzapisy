@@ -140,6 +140,7 @@ class Event(models.Model):
                 event_conflicts.add(conflict.event)
         return list(event_conflicts)
 
+    # TODO why private and why normal user can't see TYPE_OTHER
     def _user_can_see_or_404(self, user):
         """Private method. Return True if user can see event, otherwise False.
 
@@ -148,7 +149,8 @@ class Event(models.Model):
         """
         if not self.author == user and not user.has_perm('schedule.manage_events'):
             if(not self.visible or
-               self.type not in [self.TYPE_EXAM, self.TYPE_TEST, self.TYPE_GENERIC] or
+               self.type not in [self.TYPE_EXAM, self.TYPE_TEST, self.TYPE_GENERIC,
+                                 self.TYPE_CLASS, self.TYPE_SPECIAL_RESERVATION] or
                self.status != self.STATUS_ACCEPTED):
                 return False
 

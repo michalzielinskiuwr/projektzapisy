@@ -1,12 +1,19 @@
 import copy
 import json
-from datetime import datetime
+import operator
+from collections import defaultdict
+from datetime import datetime, date
+from itertools import groupby
+from typing import NamedTuple, Optional, List
 
+from django import forms
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
 from django.urls import reverse
@@ -14,7 +21,9 @@ from django.views.decorators.csrf import csrf_exempt
 
 from apps.schedule.models.term import Term
 from apps.schedule.models.event import Event
-from apps.enrollment.courses.models.classroom import Classroom
+from apps.enrollment.courses.models.classroom import Classroom, Floors
+from apps.enrollment.courses.models.semester import Semester
+from apps.enrollment.courses.models.term import Term as CourseTerm
 from apps.users.models import Student, is_employee
 
 
@@ -28,11 +37,13 @@ def report(request):
     return TemplateResponse(request, 'schedule/report.html', locals())
 
 
-def _check_and_prepare_get_data(request):
+def _check_and_prepare_get_data(request, require_dates=True):
     data = {}
     try:
-        data['start'] = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
-        data['end'] = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
+        if require_dates:
+            data['start'] = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
+            data['end'] = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
+        data['page'] = int(request.GET.get('page', 1))
         data['visible'] = bool(request.GET.get('visible', True))
         data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
@@ -61,15 +72,16 @@ def _check_and_prepare_get_data(request):
                 raise ValueError
         data['rooms'] = rooms
         return data
-    except (ValueError, TypeError):
-        return HttpResponseBadRequest('Przesłane dane są nieprawidłowe lub niewystarczające')
+    except (ValueError, TypeError, KeyError):
+        raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
 
 
-# TODO: Ask if 403 vs 500 response, ValidationError is 500, 403 == Forbidden -- choose 400 errors, 500 will log it on slack and break server - huge error
-# TODO: json payload - check if logged user is author
 # Sends only required data for fullcalendar
 def terms(request):
-    data = _check_and_prepare_get_data(request)
+    try:
+        data = _check_and_prepare_get_data(request)
+    except ValidationError as err:
+        return HttpResponseBadRequest(err)
     query = Term.objects.filter(day__range=[data['start'], data['end']]).select_related('event')
     rooms = Classroom.objects.filter(number__in=data['rooms']) if data['rooms'] else None
     if rooms:
@@ -100,7 +112,7 @@ def terms(request):
                         "type": event.type,
                         "visible": event.visible,
                         "url": event.get_absolute_url(),
-                        "user_is_author": False,
+                        "user_is_author": request.user == event.author,
                         "start": datetime.combine(term.day, term.start).isoformat(),
                         "end": datetime.combine(term.day, term.end).isoformat()})
     return JsonResponse(payload, safe=False)
@@ -108,7 +120,6 @@ def terms(request):
 
 def _check_and_prepare_post_payload(request):
     """Check if payload has proper keys nad values for creating and updating events"""
-    """Return tuple (True, None) if user can create or update event. Return (False, HttpResponseForbidden) otherwise"""
     payload = json.loads(request.body)
     checked_payload = {}
     # TODO: change author to request.user
@@ -293,7 +304,7 @@ def update_event(request, event_id):
         payload = _check_and_prepare_post_payload(request)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    event = get_object_or_404(Event, pk=event_id)
+    event = Event.get_event_or_404(event_id, request.user)
     try:
         # TODO: User.objects.get to request.user
         _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'),
@@ -392,7 +403,10 @@ def _group_terms_same_room(terms):
 def events(request):
     if request.method == "POST":
         return create_event(request)
-    data = _check_and_prepare_get_data(request)
+    try:
+        data = _check_and_prepare_get_data(request, require_dates=False)
+    except ValidationError as err:
+        return HttpResponseBadRequest(err)
     query = Event.objects.filter().select_related('author')
     if data['types']:
         query = query.filter(type__in=data['types'])
@@ -408,6 +422,8 @@ def events(request):
                              Q(author__last_name__icontains=first_name) |
                              Q(author__last_name__icontains=last_name))
     query = query.filter(visible=data['visible'])
+    query = query.order_by('-created')
+    query = Paginator(query, 20).get_page(data['page'])
     payload = []
     for event in query:
         if not event._user_can_see_or_404(request.user):
@@ -431,13 +447,15 @@ def events(request):
                         "status": event.status,
                         "type": event.type,
                         "visible": event.visible,
+                        "created": event.created,
+                        "edited": event.edited,
                         "url": event.get_absolute_url()})
     return JsonResponse(payload, safe=False)
 
 
 @csrf_exempt
 def delete_event(request, event_id):
-    event = get_object_or_404(Event, pk=event_id)
+    event = Event.get_event_or_404(event_id, request.user)
     # TODO: User.objects.get to request.user
     if not request.user.has_perm('schedule.manage_events') and event.author != User.objects.get(first_name='M_74',
                                                                                                 last_name='B_74'):
@@ -470,4 +488,6 @@ def event(request, event_id):
                          "status": event.status,
                          "type": event.type,
                          "visible": event.visible,
+                         "created": event.created,
+                         "edited": event.edited,
                          "url": event.get_absolute_url()})
