@@ -49,7 +49,7 @@ def _check_and_prepare_get_data(request, require_dates=True):
         data['visible'] = bool(request.GET.get('visible', True))
         data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
-        types = request.GET.get('types', [Event.TYPE_GENERIC, Event.TYPE_SPECIAL_RESERVATION])
+        types = request.GET.get('types', [Event.TYPE_GENERIC])
         types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
             raise TypeError
@@ -85,7 +85,7 @@ def terms(request):
         data = _check_and_prepare_get_data(request)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    query = Term.objects.filter(day__range=[data['start'], data['end']]).select_related('event')
+    query = Term.objects.filter(day__range=[data['start'], data['end']]).select_related('event', 'event__author')
     rooms = Classroom.objects.filter(number__in=data['rooms']) if data['rooms'] else None
     if rooms:
         query = query.filter(room__in=rooms)
@@ -115,7 +115,7 @@ def terms(request):
                         "type": event.type,
                         "visible": event.visible,
                         "url": event.get_absolute_url(),
-                        "user_is_author": request.user == event.author,
+                        "user_is_author": request.user is event.author,
                         "start": datetime.combine(term.day, term.start).isoformat(),
                         "end": datetime.combine(term.day, term.end).isoformat()})
     return JsonResponse(payload, safe=False)
