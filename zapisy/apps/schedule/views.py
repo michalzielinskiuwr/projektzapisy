@@ -2,13 +2,12 @@ import copy
 import json
 import operator
 from collections import defaultdict
-from datetime import datetime, date
+from datetime import date, datetime, timedelta
 from itertools import groupby
 from typing import NamedTuple, Optional, List
 
 from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
-from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
@@ -17,6 +16,7 @@ from django.shortcuts import get_object_or_404, render
 from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 
 from apps.schedule.models.term import Term
@@ -27,12 +27,14 @@ from apps.enrollment.courses.models.term import Term as CourseTerm
 from apps.users.models import Student, is_employee
 
 
+@login_required
 def calendar(request):
     room = None
     rooms = Classroom.get_in_institute(reservation=True)
     return TemplateResponse(request, 'schedule/calendar.html', locals())
 
 
+@login_required
 def report(request):
     return TemplateResponse(request, 'schedule/report.html', locals())
 
@@ -47,7 +49,7 @@ def _check_and_prepare_get_data(request, require_dates=True):
         data['visible'] = bool(request.GET.get('visible', True))
         data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
-        types = request.GET.get('types', [Event.TYPE_GENERIC])
+        types = request.GET.get('types', [Event.TYPE_GENERIC, Event.TYPE_SPECIAL_RESERVATION])
         types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
             raise TypeError
@@ -77,6 +79,7 @@ def _check_and_prepare_get_data(request, require_dates=True):
 
 
 # Sends only required data for fullcalendar
+@login_required
 def terms(request):
     try:
         data = _check_and_prepare_get_data(request)
@@ -122,14 +125,11 @@ def _check_and_prepare_post_payload(request):
     """Check if payload has proper keys nad values for creating and updating events"""
     payload = json.loads(request.body)
     checked_payload = {}
-    # TODO: change author to request.user
-    checked_payload['author'] = User.objects.get(first_name='M_74', last_name='B_74')
     try:
         checked_payload['title'] = str(payload.get('title', ''))
         checked_payload['description'] = str(payload.get('description', ''))
         checked_payload['visible'] = bool(payload.get('visible', True))
-        # TODO change to Event.STATUS_PENDING
-        checked_payload['status'] = str(payload.get('status', Event.STATUS_ACCEPTED))
+        checked_payload['status'] = str(payload.get('status', Event.STATUS_PENDING))
         if not any(checked_payload['status'] == s for s, _ in Event.STATUSES):
             raise ValueError
         checked_payload['type'] = str(payload.get('type', Event.TYPE_GENERIC))
@@ -178,7 +178,7 @@ def _check_and_prepare_post_payload(request):
 def _authorize_user_can_create_update_event(payload, user, event_author=None):
     if user.has_perm('schedule.manage_events'):
         return
-    if payload['author'] != user or (event_author and event_author != user):
+    if event_author and event_author != user:
         raise ValidationError('Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem')
     if user.student:
         if payload['type'] != Event.TYPE_GENERIC:
@@ -205,6 +205,7 @@ def _get_event_author_url(author):
 
 # Return list of conflicting terms without own terms
 @csrf_exempt
+@require_POST
 def check_conflicts(request):
     try:
         payload = _check_and_prepare_post_payload(request)
@@ -212,7 +213,7 @@ def check_conflicts(request):
         return HttpResponseBadRequest(err)
     terms_conflicts = set()
     with transaction.atomic():
-        event = Event.objects.create(title=payload['title'], author=payload['author'],
+        event = Event.objects.create(title=payload['title'], author=request.user,
                                      description=payload['description'],
                                      type=payload['type'], visible=payload['visible'], status=payload['status'])
         for term in payload['terms']:
@@ -239,7 +240,9 @@ def check_conflicts(request):
     return JsonResponse(payload, safe=False)
 
 
-# gets json, same structure like in GET
+# payload is json, same structure like in GET
+@login_required
+@require_POST
 @csrf_exempt
 @transaction.atomic
 def create_event(request):
@@ -248,11 +251,10 @@ def create_event(request):
     except ValidationError as err:
         return HttpResponseBadRequest(err)
     try:
-        # TODO: User.objects.get to request.user
-        _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'))
+        _authorize_user_can_create_update_event(payload, request.user)
     except ValidationError as err:
         return HttpResponseForbidden(err)
-    event = Event.objects.create(title=payload['title'], author=payload['author'], description=payload['description'],
+    event = Event.objects.create(title=payload['title'], author=request.user, description=payload['description'],
                                  type=payload['type'], visible=payload['visible'], status=payload['status'])
     for term in payload['terms']:
         Term.objects.create(event=event, day=term["day"], start=term["start"],
@@ -297,7 +299,9 @@ def create_event(request):
                          "url": event.get_absolute_url()}, status=201)
 
 
+@login_required
 @csrf_exempt
+@require_POST
 @transaction.atomic
 def update_event(request, event_id):
     try:
@@ -306,9 +310,7 @@ def update_event(request, event_id):
         return HttpResponseBadRequest(err)
     event = Event.get_event_or_404(event_id, request.user)
     try:
-        # TODO: User.objects.get to request.user
-        _authorize_user_can_create_update_event(payload, User.objects.get(first_name='M_74', last_name='B_74'),
-                                                event_author=event.author)
+        _authorize_user_can_create_update_event(payload, request.user)
     except ValidationError as err:
         return HttpResponseForbidden(err)
     event.title = payload['title']
@@ -399,6 +401,7 @@ def _group_terms_same_room(terms):
     return new_terms
 
 
+@login_required
 @csrf_exempt
 def events(request):
     if request.method == "POST":
@@ -453,17 +456,18 @@ def events(request):
     return JsonResponse(payload, safe=False)
 
 
+@login_required
 @csrf_exempt
+@require_POST
 def delete_event(request, event_id):
     event = Event.get_event_or_404(event_id, request.user)
-    # TODO: User.objects.get to request.user
-    if not request.user.has_perm('schedule.manage_events') and event.author != User.objects.get(first_name='M_74',
-                                                                                                last_name='B_74'):
+    if not request.user.has_perm('schedule.manage_events') and event.author != request.user:
         return HttpResponseForbidden('Nie można usuwać wydarzeń nie będąc ich autorem')
     event.delete()
     return HttpResponse("Event deleted", status=200)
 
 
+@login_required
 @csrf_exempt
 def event(request, event_id):
     if request.method == "POST":
@@ -491,3 +495,179 @@ def event(request, event_id):
                          "created": event.created,
                          "edited": event.edited,
                          "url": event.get_absolute_url()})
+
+
+class TableReportForm(forms.Form):
+    """Form for generating table-based events report."""
+    today = date.today().isoformat()
+    beg_date = forms.DateField(
+        label='Od:',
+        widget=forms.TextInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'value': today}))
+    end_date = forms.DateField(
+        label='Do:',
+        widget=forms.TextInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'value': today}))
+    rooms = forms.MultipleChoiceField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        classrooms = Classroom.objects.filter(can_reserve=True)
+        by_floor = defaultdict(list)
+        floor_names = dict(Floors.choices)
+        for r in classrooms:
+            by_floor[floor_names[r.floor]].append((r.pk, r.number))
+        self.fields['rooms'].choices = by_floor.items()
+
+
+class DoorChartForm(forms.Form):
+    """Form for generating door event charts."""
+    today = date.today().isoformat()
+    rooms = forms.MultipleChoiceField()
+    week = forms.CharField(max_length=10, widget=forms.Select())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        classrooms = Classroom.objects.filter(can_reserve=True)
+        by_floor = defaultdict(list)
+        floor_names = dict(Floors.choices)
+        for r in classrooms:
+            by_floor[floor_names[r.floor]].append((r.pk, r.number))
+        self.fields['rooms'].choices = by_floor.items()
+
+        semester = Semester.get_current_semester()
+        next_sem = Semester.get_upcoming_semester()
+        weeks = [(week[0], f"{week[0]} - {week[1]}") for week in semester.get_all_weeks()]
+        if semester != next_sem:
+            weeks.insert(0, ('nextsem', f"Generuj z planu zajęć dla semestru '{next_sem}'"))
+        weeks.insert(0, ('currsem', f"Generuj z planu zajęć dla semestru '{semester}'"))
+        self.fields['week'].widget.choices = weeks
+
+
+@login_required
+@permission_required('schedule.manage_events')
+def events_report(request):
+    form_table = None
+    form_doors = None
+    if request.method == 'POST':
+        # Pick the form that was sent.
+        if request.POST['report-type'] == 'table':
+            form = form_table = TableReportForm(request.POST)
+            report_type = 'table'
+        else:
+            form = form_doors = DoorChartForm(request.POST)
+            report_type = 'doors'
+        if form.is_valid():
+            return display_report(request, form, report_type)
+    else:
+        # Just display two forms.
+        form_table = TableReportForm()
+        form_doors = DoorChartForm()
+    return render(request, 'schedule/reports/forms.html', {
+        'form_table': form_table,
+        'form_doors': form_doors,
+    })
+
+
+@login_required
+@permission_required('schedule.manage_events')
+def display_report(request, form, report_type: 'Literal["table", "doors"]'):  # noqa: F821
+    class ListEvent(NamedTuple):
+        date: Optional[datetime]
+        weekday: int  # Monday is 1, Sunday is 7 like in
+        # https://docs.python.org/3/library/datetime.html#datetime.date.isoweekday.
+        begin: datetime.time
+        end: datetime.time
+        room: Classroom
+        title: str
+        type: str
+        author: str
+
+    rooms = set(Classroom.objects.filter(id__in=form.cleaned_data['rooms']))
+    events: List[ListEvent] = []
+    # Every event will regardless of its origin be translated into a ListEvent.
+    beg_date = form.cleaned_data.get('beg_date', None)
+    end_date = form.cleaned_data.get('end_date', None)
+    semester = None
+    if form.cleaned_data.get('week', None) == 'currsem':
+        semester = Semester.get_current_semester()
+    elif form.cleaned_data.get('week', None) == 'nextsem':
+        semester = Semester.get_upcoming_semester()
+    if semester:
+        terms = CourseTerm.objects.filter(
+            group__course__semester=semester, classrooms__in=rooms).distinct().select_related(
+                'group__course', 'group__teacher',
+                'group__teacher__user').prefetch_related('classrooms')
+        for term in terms:
+            for r in set(term.classrooms.all()) & rooms:
+                events.append(
+                    ListEvent(date=None,
+                              weekday=int(term.dayOfWeek),
+                              begin=term.start_time,
+                              end=term.end_time,
+                              room=r,
+                              title=term.group.course.name,
+                              type=term.group.get_type_display(),
+                              author=term.group.teacher.get_full_name()))
+        special_reservation_events = Event.objects.filter(type=Event.TYPE_SPECIAL_RESERVATION)
+        semester_start_day = semester.semester_beginning
+        semester_end_day = semester.semester_ending
+        terms = []
+        # Special reservations have same room, start and end every week. Do not duplicate those terms
+        for event in special_reservation_events:
+            same_room_hour_terms = set()
+            temp_terms = event.term_set.all()
+            for term in temp_terms:
+                if semester_start_day <= term.day <= semester_end_day and term.room in rooms\
+                        and (term.room, term.start, term.end) not in same_room_hour_terms:
+                    same_room_hour_terms.add((term.room, term.start, term.end))
+                    terms.append(term)
+        for term in terms:
+            events.append(
+                ListEvent(date=None,
+                          weekday=term.day.isoweekday(),
+                          begin=term.start,
+                          end=term.end,
+                          room=term.room,
+                          title=term.event.title,
+                          type="",
+                          author=""))
+    elif 'week' in form.cleaned_data:
+        beg_date = datetime.strptime(form.cleaned_data['week'], "%Y-%m-%d")
+        end_date = beg_date + timedelta(days=6)
+    if beg_date and end_date:
+        terms = Term.objects.filter(day__gte=beg_date,
+                                    day__lte=end_date,
+                                    room__in=rooms,
+                                    event__status=Event.STATUS_ACCEPTED).select_related(
+                                        'room', 'event', 'event__group', 'event__author')
+        for term in terms:
+            events.append(
+                ListEvent(date=term.day,
+                          weekday=term.day.isoweekday(),
+                          begin=term.start,
+                          end=term.end,
+                          room=term.room,
+                          title=term.event.title or str(term.event.course) or "",
+                          type=term.event.group.get_type_display()
+                          if term.event.group else term.event.get_type_display(),
+                          author=term.event.author.get_full_name()))
+    if report_type == 'table':
+        events = sorted(events, key=operator.attrgetter('room.id', 'date', 'begin'))
+    else:
+        events = sorted(events, key=operator.attrgetter('room.id', 'weekday', 'begin'))
+    terms_by_room = groupby(events, operator.attrgetter('room.number'))
+    terms_by_room = sorted([(int(k), list(g)) for k, g in terms_by_room])
+
+    return render(request, f'schedule/reports/report_{report_type}.html', {
+        'events': terms_by_room,
+        'semester': semester,
+        'beg_date': beg_date,
+        'end_date': end_date,
+    })
