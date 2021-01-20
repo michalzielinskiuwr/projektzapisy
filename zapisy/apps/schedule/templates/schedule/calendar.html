@@ -6,12 +6,14 @@
 
 {% block bread %}
     <li class="breadcrumb-item"><a href="{% url 'main-page' %}">Strona główna</a></li>
-    <li class="breadcrumb-item active" aria-current="page">Sale + Wydarzenia</li>
+    <li class="breadcrumb-item"><a href="{% url 'schedule:calendar' %}">Sale</a></li>
+    <li class="breadcrumb-item active" aria-current="page">Kalendarz</li>
 {% endblock %}
 
 {% block all-content %}
-<h2>{% block calendartitle %} Sale + Wydarzenia {% endblock %}</h2>
+<h2>{% block calendartitle %} Kalendarz {% endblock %}</h2>
 {% block calendarview %}
+
 <div class="alert alert-info fade show" role="alert">
     Wybierz daty, sale, jednostki oraz typ wydarzenia do wyświetlenia.
 </div>
@@ -36,7 +38,7 @@
             <label for="title_author_input">Tytuł/Autor wydarzenia:</label>
             <input type="text" class="form-control" id="title_author_input" placeholder="Seminarium lub Jan Nowak">
         </div>
-        <div class="form-group col-sm-4">
+        <div class="form-group col-sm-4" id="event_type">
             <label>Typ wydarzenia:</label>
             <div class="row" style="margin-left: 0px;">
                 <div class="form-check form-check-inline">
@@ -51,15 +53,17 @@
                     <input class="form-check-input" type="checkbox" value="" id="exam_checkbox" checked>
                     <label class="form-check-label" for="exam_checkbox">Egzamin</label>
                 </div>
-            </div>
-            <div class="row" style="margin-left: 0px;">
                 <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" value="" id="classes_checkbox" checked>
+                    <input class="form-check-input" type="checkbox" value="" id="classes_checkbox">
                     <label class="form-check-label" for="classes_checkbox">Zajęcia</label>
                 </div>
                 <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" value="" id="other_checkbox" checked>
+                    <input class="form-check-input" type="checkbox" value="" id="other_checkbox">
                     <label class="form-check-label" for="other_checkbox">Pozostałe</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="checkbox" value="" id="special_reservation_checkbox">
+                    <label class="form-check-label" for="special_reservation_checkbox">Rezerwacja cykliczna/stała</label>
                 </div>
             </div>
         </div>
@@ -80,20 +84,6 @@
                 </div>
                 <div class="modal-body">
                     <form method="post" action="create_event">
-                        <div class="form-group row">
-                            <div class="col">
-                                <label for="reservation_date">Dzień</label>
-                                <input type="date" id="reservation_date">
-                            </div>
-                            <div class="col">
-                                <label for="reservation_time_start">Początek</label>
-                                <input type="time" id="reservation_time_start" min="8:00" max="22:00" value="10:00">
-                            </div>
-                            <div class="col">
-                                <label for="reservation_time_end">Koniec</label>
-                                <input type="time" id="reservation_time_end" min="8:00" max="22:00" value="12:00">
-                            </div>
-                        </div>
                         <div class="form-group">
                             <label for="reservation_name">Nazwa wydarzenia</label>
                             <input type="text" class="form-control" id="reservation_name" placeholder="Seminarium">
@@ -117,24 +107,90 @@
                             <label for="reservation_description">Opis wydarzenia</label>
                             <textarea class="form-control" id="reservation_description" rows="5"></textarea>
                         </div>
-                        <div class="form-group">
-                            <label for="reservation_room">Miejsce wydarzenia</label>
-                            <select class="form-control" id="reservation_room">
-                                <option value="room_none">Miejsce poza Instytutem Informatyki</option>
-                                {% for floor in floor_list %}
-                                    <optgroup label="{{ floor.grouper }}">
-                                        {% for r in floor.list %}
+<!--                        <div class="form-group row">-->
+<!--                            <div class="col-md-2">-->
+<!--                                <label for="reservation_date">Dzień</label>-->
+<!--                                <input type="date" id="reservation_date">-->
+<!--                            </div>-->
+<!--                            <div class="col-md-2">-->
+<!--                                <label for="reservation_time_start">Początek</label>-->
+<!--                                <input type="time" id="reservation_time_start" min="8:00" max="22:00" value="10:00">-->
+<!--                            </div>-->
+<!--                            <div class="col-md-2">-->
+<!--                                <label for="reservation_time_end">Koniec</label>-->
+<!--                                <input type="time" id="reservation_time_end" min="8:00" max="22:00" value="12:00">-->
+<!--                            </div>-->
+<!--                            <div class="col-md-5">-->
+<!--                            <label for="reservation_room">Miejsce wydarzenia</label>-->
+<!--                            <select class="form-control" id="reservation_room" multiple="multiple">-->
+<!--                                <option value="room_none">Miejsce poza Instytutem Informatyki</option>-->
+<!--                                {% for floor in floor_list %}-->
+<!--                                    <optgroup label="{{ floor.grouper }}">-->
+<!--                                        {% for r in floor.list %}-->
+<!--                                            <option value="{{ r.number }}">-->
+<!--                                                {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})-->
+<!--                                            </option>-->
+<!--                                        {% endfor %}-->
+<!--                                    </optgroup>-->
+<!--                                {% endfor %}-->
+<!--                            </select>-->
+<!--                            <div class="form-group" id="reservation_place_div">-->
+<!--                                <br>-->
+<!--                                <input type="text" class="form-control" id="reservation_place" placeholder="Sala 13 w IM">-->
+<!--                            </div>-->
+<!--                        </div>-->
+<!--                        </div>-->
+                        <hr/>
+                        <table class="">
+                            <thead>
+                            <tr>
+                                <th class="">
+                                    <div class="col-md-2">
+                                        <label for="reservation_date">Dzień</label>
+                                        <input type="date" id="reservation_date">
+                                    </div>
+                                </th>
+                                <th class="tg-0lax" rowspan="3">
+                                    <label for="reservation_room">Miejsce wydarzenia</label>
+                                    <select class="form-control" id="reservation_room" multiple="multiple">
+                                        <option value="room_none">Miejsce poza Instytutem Informatyki</option>
+                                        {% for floor in floor_list %}
+                                        <optgroup label="{{ floor.grouper }}">
+                                            {% for r in floor.list %}
                                             <option value="{{ r.number }}">
                                                 {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
                                             </option>
+                                            {% endfor %}
+                                        </optgroup>
                                         {% endfor %}
-                                    </optgroup>
-                                {% endfor %}
-                            </select>
-                            <div class="form-group" id="reservation_place_div">
-                                <input type="text" class="form-control" id="reservation_place" placeholder="Sala 13 w IM">
-                            </div>
-                        </div>
+                                    </select>
+                                    <div class="form-group" id="reservation_place_div">
+                                        <br>
+                                        <input type="text" class="form-control" id="reservation_place"
+                                               placeholder="Sala 13 w IM">
+                                    </div>
+                                </th>
+                            </tr>
+                            <tr>
+                                <td class="">
+                                    <div class="col-md-2">
+                                        <label for="reservation_time_start">Początek</label>
+                                        <input type="time" id="reservation_time_start" min="8:00" max="22:00"
+                                               value="10:00">
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="">
+                                    <div class="col-md-2">
+                                        <label for="reservation_time_end">Koniec</label>
+                                        <input type="time" id="reservation_time_end" min="8:00" max="22:00"
+                                               value="12:00">
+                                    </div>
+                                </td>
+                            </tr>
+                            </thead>
+                        </table>
                     </form>
                 </div>
                 <div class="modal-footer">
