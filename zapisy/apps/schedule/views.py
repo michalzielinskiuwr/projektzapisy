@@ -35,6 +35,7 @@ def calendar(request):
 
 
 @login_required
+@permission_required('schedule.manage_events')
 def report(request):
     return TemplateResponse(request, 'schedule/report.html', locals())
 
@@ -49,7 +50,7 @@ def _check_and_prepare_get_data(request, require_dates=True):
         data['visible'] = bool(request.GET.get('visible', True))
         data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
-        types = request.GET.get('types', [Event.TYPE_GENERIC])
+        types = request.GET.get('types', [])
         types = types.split(',') if isinstance(types, str) else types
         if not isinstance(types, list):
             raise TypeError
@@ -115,7 +116,7 @@ def terms(request):
                         "type": event.type,
                         "visible": event.visible,
                         "url": event.get_absolute_url(),
-                        "user_is_author": request.user is event.author,
+                        "user_is_author": request.user == event.author,
                         "start": datetime.combine(term.day, term.start).isoformat(),
                         "end": datetime.combine(term.day, term.end).isoformat()})
     return JsonResponse(payload, safe=False)
@@ -181,13 +182,13 @@ def _authorize_user_can_create_update_event(payload, user, event_author=None):
     if event_author and event_author != user:
         raise ValidationError('Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem')
     if user.student:
-        if payload['type'] != Event.TYPE_GENERIC:
+        if not any(payload['type'] == t for t, _ in Event.TYPES_FOR_STUDENT):
             raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
         if payload['status'] != Event.STATUS_PENDING:
             raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
     # Employee can create accepted exam and test events
     if user.employee:
-        if payload['type'] not in Event.TYPES_FOR_TEACHER:
+        if not any(payload['type'] == t for t, _ in Event.TYPES_FOR_TEACHER):
             raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
         if payload['type'] == Event.TYPE_GENERIC and payload['status'] != Event.STATUS_PENDING:
             raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
@@ -204,8 +205,9 @@ def _get_event_author_url(author):
 
 
 # Return list of conflicting terms without own terms
-@csrf_exempt
+@login_required
 @require_POST
+@csrf_exempt
 def check_conflicts(request):
     try:
         payload = _check_and_prepare_post_payload(request)
@@ -241,9 +243,6 @@ def check_conflicts(request):
 
 
 # payload is json, same structure like in GET
-@login_required
-@require_POST
-@csrf_exempt
 @transaction.atomic
 def create_event(request):
     try:
@@ -283,8 +282,7 @@ def create_event(request):
                             "place": term.place})
         transaction.set_rollback(True)
         return JsonResponse(payload, safe=False, status=400)
-    return JsonResponse({"emails": list(event.get_followers()),
-                         "terms": [{"start": t.start,
+    return JsonResponse({"terms": [{"start": t.start,
                                     "end": t.end,
                                     "day": t.day,
                                     "room": t.room.number if t.room else None,
@@ -299,9 +297,6 @@ def create_event(request):
                          "url": event.get_absolute_url()}, status=201)
 
 
-@login_required
-@csrf_exempt
-@require_POST
 @transaction.atomic
 def update_event(request, event_id):
     try:
@@ -366,8 +361,7 @@ def update_event(request, event_id):
                             "place": term.place})
         transaction.set_rollback(True)
         return JsonResponse(payload, safe=False, status=400)
-    return JsonResponse({"emails": list(event.get_followers()),
-                         "terms": [{"start": t.start,
+    return JsonResponse({"terms": [{"start": t.start,
                                     "end": t.end,
                                     "day": t.day,
                                     "room": t.room.number if t.room else None,
@@ -410,7 +404,7 @@ def events(request):
         data = _check_and_prepare_get_data(request, require_dates=False)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    query = Event.objects.filter().select_related('author')
+    query = Event.objects.filter().select_related('author', 'event__author')
     if data['types']:
         query = query.filter(type__in=data['types'])
     if data['statuses']:
@@ -441,11 +435,11 @@ def events(request):
             if not student.consent_granted() and not request.user.employee:
                 author = None
                 author_url = None
-        payload.append({"emails": list(event.get_followers()),
-                        "terms": _group_terms_same_room(terms),
+        payload.append({"terms": _group_terms_same_room(terms),
                         "description": event.description,
                         "author": author.get_full_name() if author else None,
                         "author_url": author_url,
+                        "user_is_author": request.user == author,
                         "title": event.title,
                         "status": event.status,
                         "type": event.type,
@@ -483,11 +477,11 @@ def event(request, event_id):
         if not student.consent_granted() and not request.user.employee:
             author = None
             author_url = None
-    return JsonResponse({"emails": list(event.get_followers()),
-                         "terms": _group_terms_same_room(terms),
+    return JsonResponse({"terms": _group_terms_same_room(terms),
                          "description": event.description,
                          "author": author.get_full_name() if author else None,
                          "author_url": author_url,
+                         "user_is_author": request.user == author,
                          "title": event.title,
                          "status": event.status,
                          "type": event.type,
