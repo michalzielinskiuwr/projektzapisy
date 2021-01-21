@@ -18,8 +18,8 @@
     Wybierz daty, sale, jednostki oraz typ wydarzenia do wyświetlenia.
 </div>
 
-<form style="margin-bottom: 10px;">
-    <div class="form-row">
+<div style="margin-bottom: 10px;">
+    <div id="filters" class="form-row">
         <div class="form-group col-sm-3">
             {% regroup rooms by get_floor_display as floor_list %}
             <label for="room_selector">Wybierz sale:</label>
@@ -200,7 +200,116 @@
             </div>
         </div>
     </div>
-</form>
+
+    <div class="modal fade" id="edit_event_modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="edit_event_title">Edytuj wydarzenie</h5>
+                    <button type="button" class="close" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div>
+                        <div class="form-group">
+                            <label for="edit_reservation_author">Autor wydarzenia</label>
+                            <input type="text" class="form-control" id="edit_reservation_author" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_reservation_name">Nazwa wydarzenia</label>
+                            <input type="text" class="form-control" id="edit_reservation_name">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_reservation_type">Rodzaj wydarzenia</label>
+                            <select class="form-control" id="edit_reservation_type">
+                                <option value="type_event">Wydarzenie</option>
+                                <option value="type_exam">Egzamin</option>
+                                <option value="type_test">Kolokwium</option>
+                                <option value="type_special_reservation">Rezerwacja cykliczna</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_reservation_visibility">Wydarzenie widoczne dla wszystkich użytkowników systemu:</label>
+                            <select class="form-control" id="edit_reservation_visibility">
+                                <option value="visible">Tak</option>
+                                <option value="not_visible">Nie</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_reservation_status">Status wydarzenia:</label>
+                            <select class="form-control" id="edit_reservation_status">
+                                <option value="pending">Oczekujące</option>
+                                <option value="accepted">Zaakceptowane</option>
+                                <option value="rejected">Odrzucone</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_reservation_description">Opis wydarzenia</label>
+                            <textarea class="form-control" id="edit_reservation_description" rows="5"></textarea>
+                        </div>
+                        <hr/>
+                        <table class="">
+                            <thead>
+                            <tr>
+                                <th class="">
+                                    <div class="col-md-2">
+                                        <label for="edit_reservation_date">Dzień</label>
+                                        <input type="date" id="edit_reservation_date">
+                                    </div>
+                                </th>
+                                <th class="tg-0lax" rowspan="3">
+                                    <label for="edit_reservation_room">Miejsce wydarzenia</label>
+                                    <select class="form-control" id="edit_reservation_room" multiple="multiple">
+                                        <option value="room_none">Miejsce poza Instytutem Informatyki</option>
+                                        {% for floor in floor_list %}
+                                        <optgroup label="{{ floor.grouper }}">
+                                            {% for r in floor.list %}
+                                            <option value="{{ r.number }}">
+                                                {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
+                                            </option>
+                                            {% endfor %}
+                                        </optgroup>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-group" id="edit_reservation_place_div">
+                                        <br>
+                                        <input type="text" class="form-control" id="edit_reservation_place"
+                                               placeholder="Sala 13 w IM">
+                                    </div>
+                                </th>
+                            </tr>
+                            <tr>
+                                <td class="">
+                                    <div class="col-md-2">
+                                        <label for="edit_reservation_time_start">Początek</label>
+                                        <input type="time" id="edit_reservation_time_start" min="8:00" max="22:00" step="60"
+                                               value="10:00">
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="">
+                                    <div class="col-md-2">
+                                        <label for="edit_reservation_time_end">Koniec</label>
+                                        <input type="time" id="edit_reservation_time_end" min="8:00" max="22:00" step="60"
+                                               value="12:00">
+                                    </div>
+                                </td>
+                            </tr>
+                            </thead>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="edit_event_dismiss">Anuluj</button>
+                    <button type="button" class="btn btn-danger" id="edit_event_delete">Usuń wydarzenie</button>
+                    <button type="button" class="btn btn-success" id="edit_event_button">Zaakceptuj zmiany</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% render_bundle 'schedule-fullcalendar' %}
 <div id='calendar'></div>
