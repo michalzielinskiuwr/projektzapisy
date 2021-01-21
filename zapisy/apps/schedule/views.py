@@ -52,28 +52,20 @@ def _check_and_prepare_get_data(request, require_dates=True):
         data['title_or_author'] = str(request.GET.get('title_author', ''))
         types = request.GET.get('types', [])
         types = types.split(',') if isinstance(types, str) else types
-        if not isinstance(types, list):
-            raise TypeError
         for type_ in types:
             if not any(type_ == t for t, _ in Event.TYPES):
                 raise ValueError
         data['types'] = types
         statuses = request.GET.get('statuses', [])
         statuses = statuses.split(',') if isinstance(statuses, str) else statuses
-        if not isinstance(statuses, list):
-            raise TypeError
         for status in statuses:
             if not any(status == s for s, _ in Event.STATUSES):
                 raise ValueError
         data['statuses'] = statuses
         rooms = request.GET.get('rooms', [])
+        # to avoid 500 error rooms must be strings (empty string still works)
         rooms = rooms.split(',') if rooms else rooms
-        if not isinstance(rooms, list):
-            raise TypeError
-        for room in rooms:
-            if not isinstance(room, str):
-                raise ValueError
-        data['rooms'] = rooms
+        data['rooms'] = [str(room) for room in rooms]
         return data
     except (ValueError, TypeError, KeyError):
         raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
@@ -122,78 +114,6 @@ def terms(request):
     return JsonResponse(payload, safe=False)
 
 
-def _check_and_prepare_post_payload(request):
-    """Check if payload has proper keys nad values for creating and updating events"""
-    payload = json.loads(request.body)
-    checked_payload = {}
-    try:
-        checked_payload['title'] = str(payload.get('title', ''))
-        checked_payload['description'] = str(payload.get('description', ''))
-        checked_payload['visible'] = bool(payload.get('visible', True))
-        checked_payload['status'] = str(payload.get('status', Event.STATUS_PENDING))
-        if not any(checked_payload['status'] == s for s, _ in Event.STATUSES):
-            raise ValueError
-        checked_payload['type'] = str(payload.get('type', Event.TYPE_GENERIC))
-        if not any(checked_payload['type'] == t for t, _ in Event.TYPES):
-            raise ValueError
-        payload_terms = payload.get('terms', [])
-        if not isinstance(payload_terms, list):
-            raise TypeError
-        if not payload_terms:
-            raise ValueError
-        terms = []
-        # TODO use clean method from model
-        for payload_term in payload_terms:
-            if not isinstance(payload_term, dict):
-                raise TypeError
-            term = dict()
-            term['start'] = datetime.strptime(payload_term['start'], '%H:%M').time()
-            term['end'] = datetime.strptime(payload_term['end'], '%H:%M').time()
-            term['day'] = datetime.strptime(payload_term['day'], '%Y-%m-%d').date()
-            if payload_term['start'] >= payload_term['end']:
-                raise ValidationError('Koniec musi następować po początku')
-            if 'place' not in payload_term and 'rooms' not in payload_term:
-                raise KeyError
-            if 'rooms' in payload_term and payload_term['rooms'] and isinstance(payload_term['rooms'], list):
-                for room_number in payload_term['rooms']:
-                    room = get_object_or_404(Classroom, number=room_number)
-                    if not room.can_reserve:
-                        raise ValidationError('Ta sala nie jest przeznaczona do rezerwacji')
-                    term['room'] = room
-                    term['place'] = None
-                    terms.append(term)
-                    term = copy.deepcopy(term)
-            # Only one of 'room' and 'place' can be set.
-            else:
-                term['room'] = None
-                if not isinstance(payload_term['place'], str):
-                    raise ValueError
-                term['place'] = payload_term['place']
-                terms.append(term)
-        checked_payload['terms'] = terms
-        return checked_payload
-    except (ValueError, TypeError, KeyError):
-        raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
-
-
-def _authorize_user_can_create_update_event(payload, user, event_author=None):
-    if user.has_perm('schedule.manage_events'):
-        return
-    if event_author and event_author != user:
-        raise ValidationError('Nie można tworzyć lub zmieniać wydarzeń nie będąc ich autorem')
-    if user.student:
-        if not any(payload['type'] == t for t, _ in Event.TYPES_FOR_STUDENT):
-            raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
-        if payload['status'] != Event.STATUS_PENDING:
-            raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
-    # Employee can create accepted exam and test events
-    if user.employee:
-        if not any(payload['type'] == t for t, _ in Event.TYPES_FOR_TEACHER):
-            raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
-        if payload['type'] == Event.TYPE_GENERIC and payload['status'] != Event.STATUS_PENDING:
-            raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
-
-
 def _get_event_author_url(author):
     if not author:
         return ""
@@ -204,31 +124,57 @@ def _get_event_author_url(author):
     return author_url
 
 
-# Return list of conflicting terms without own terms
-@login_required
-@require_POST
-@csrf_exempt
-def check_conflicts(request):
+# TODO - try to catch 404 error from get_object_or_404
+def _get_cleaned_terms_list(payload, event=None):
+    """Get payload json. Returns list of new Terms. Run clean() on each one. Do not run save(). Throws ValidationError
+        given event in args will be used to insert into Terms"""
     try:
-        payload = _check_and_prepare_post_payload(request)
-    except ValidationError as err:
-        return HttpResponseBadRequest(err)
-    terms_conflicts = set()
-    with transaction.atomic():
-        event = Event.objects.create(title=payload['title'], author=request.user,
-                                     description=payload['description'],
-                                     type=payload['type'], visible=payload['visible'], status=payload['status'])
-        for term in payload['terms']:
-            term_conflicts = Term.objects.create(event=event, day=term["day"], start=term["start"], end=term["end"],
-                                                 room=term["room"], place=term["place"]).get_conflicted()
-            for conflict in term_conflicts:
-                terms_conflicts.add(conflict)
-        transaction.set_rollback(True)
+        payload_terms = payload.get('terms', [])
+        if not payload_terms:
+            raise ValueError
+        terms = []
+        for payload_term in payload_terms:
+            term = Term(event=event)
+            term.start = datetime.strptime(payload_term['start'], '%H:%M').time()
+            term.end = datetime.strptime(payload_term['end'], '%H:%M').time()
+            term.day = datetime.strptime(payload_term['day'], '%Y-%m-%d').date()
+            if 'rooms' in payload_term and payload_term['rooms']:
+                for room_number in payload_term['rooms']:
+                    room = get_object_or_404(Classroom, number=room_number)
+                    term.room = room
+                    term.place = None
+                    term.clean()
+                    terms.append(term)
+                    term = copy.deepcopy(term)
+            else:
+                term.room = None
+                term.place = payload_term['place']
+                term.clean()
+                terms.append(term)
+        if not terms:
+            raise ValueError
+        return terms
+    except (ValueError, TypeError, KeyError):
+        raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
+
+
+# TODO catch 404 error from get_object_or_404
+def _check_conflicts(new_terms, present_terms=[]):
+    """Takes payload - json. Raise ValidationError, return set of conflics_terms"""
+    conflicts_terms = set()
+    for new_term in new_terms:
+        temp_conflicts = new_term.get_conflicted_except_given_terms(present_terms)
+        for conflict in temp_conflicts:
+            conflicts_terms.add(conflict)
+    return conflicts_terms
+
+
+def _send_conflicts(conflicts, status=200):
     payload = []
-    for term in terms_conflicts:
+    for term in conflicts:
         payload.append({"title": term.event.title,
                         "description": term.event.description,
-                        "author": term.event.author.get_full_name() if event.author else None,
+                        "author": term.event.author.get_full_name() if term.event.author else None,
                         "author_url": _get_event_author_url(term.event.author),
                         "status": term.event.status,
                         "type": term.event.type,
@@ -239,49 +185,46 @@ def check_conflicts(request):
                         "day": term.day,
                         "room": term.room.number if term.room else None,
                         "place": term.place})
-    return JsonResponse(payload, safe=False)
+    return JsonResponse(payload, safe=False, status=status)
+
+
+# Return list of conflicting terms without own terms
+@login_required
+@require_POST
+@csrf_exempt
+def check_conflicts(request, event_id):
+    payload = json.loads(request.body)
+    try:
+        event = get_object_or_404(Event, id=event_id)
+        conflicts = _check_conflicts(_get_cleaned_terms_list(payload),
+                                     present_terms=event.term_set.all().select_related('room'))
+    except ValidationError as err:
+        return HttpResponseBadRequest(err)
+    return _send_conflicts(conflicts, status=200)
 
 
 # payload is json, same structure like in GET
 @transaction.atomic
 def create_event(request):
+    payload = json.loads(request.body)
+    event = Event()
+    event.title = payload.get('title', '')
+    event.author = request.user
+    event.description = payload.get('description', '')
+    event.visible = payload.get('visible', True)
+    event.status = payload.get('status', Event.STATUS_PENDING)
+    event.type = payload.get('type', Event.TYPE_GENERIC)
     try:
-        payload = _check_and_prepare_post_payload(request)
+        event.clean()
+        terms = _get_cleaned_terms_list(payload, event=event)
+        conflicts = _check_conflicts(terms)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    try:
-        _authorize_user_can_create_update_event(payload, request.user)
-    except ValidationError as err:
-        return HttpResponseForbidden(err)
-    event = Event.objects.create(title=payload['title'], author=request.user, description=payload['description'],
-                                 type=payload['type'], visible=payload['visible'], status=payload['status'])
-    for term in payload['terms']:
-        Term.objects.create(event=event, day=term["day"], start=term["start"],
-                            end=term["end"], room=term["room"], place=term["place"])
-    terms = event.term_set.all().select_related('room')
-    if event.get_conflicted():
-        terms_conflicts = set()
-        for term in terms:
-            term_conflicts = term.get_conflicted()
-            for conflict in term_conflicts:
-                terms_conflicts.add(conflict)
-        payload = []
-        for term in terms_conflicts:
-            payload.append({"title": term.event.title,
-                            "description": term.event.description,
-                            "author": term.event.author.get_full_name() if event.author else None,
-                            "author_url": _get_event_author_url(term.event.author),
-                            "status": term.event.status,
-                            "type": term.event.type,
-                            "visible": term.event.visible,
-                            "url": term.event.get_absolute_url(),
-                            "start": term.start,
-                            "end": term.end,
-                            "day": term.day,
-                            "room": term.room.number if term.room else None,
-                            "place": term.place})
-        transaction.set_rollback(True)
-        return JsonResponse(payload, safe=False, status=400)
+    if conflicts:
+        return _send_conflicts(conflicts, status=400)
+    event.save()
+    for term in terms:
+        term.save()
     return JsonResponse({"terms": [{"start": t.start,
                                     "end": t.end,
                                     "day": t.day,
@@ -299,73 +242,33 @@ def create_event(request):
 
 @transaction.atomic
 def update_event(request, event_id):
+    payload = json.loads(request.body)
     try:
-        payload = _check_and_prepare_post_payload(request)
+        event = Event.get_event_or_404(event_id, request.user)
+        event.title = payload.get('title', '')
+        event.author = request.user
+        event.description = payload.get('description', '')
+        event.visible = payload.get('visible', True)
+        event.status = payload.get('status', Event.STATUS_PENDING)
+        event.type = payload.get('type', Event.TYPE_GENERIC)
+        event.clean()
+        new_terms = _get_cleaned_terms_list(payload, event=event)
+        present_terms = event.term_set.all().select_related('room')
+        conflicts = _check_conflicts(new_terms, present_terms=present_terms)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    event = Event.get_event_or_404(event_id, request.user)
-    try:
-        _authorize_user_can_create_update_event(payload, request.user)
-    except ValidationError as err:
-        return HttpResponseForbidden(err)
-    event.title = payload['title']
-    event.description = payload['description']
-    event.type = payload['type']
-    event.visible = payload['visible']
-    event.status = payload['status']
+    if conflicts:
+        return _send_conflicts(conflicts, status=400)
     event.save()
-    for payload_term in payload['terms']:
-        payload_term['matched'] = False
-    terms = event.term_set.all().select_related('room')
-    for term in terms:
-        matched = False
-        # Check if term from event before changes is in new term list, if found do nothing, delete otherwise
-        for payload_term in payload['terms']:
-            if term.room is not payload_term['room'] or term.place != payload_term['place']:
-                continue
-            if term.day != payload_term['day']:
-                continue
-            if term.start != payload_term['start'] or term.end != payload_term['end']:
-                continue
-            matched = True
-            payload_term['matched'] = True
-            break
-        if not matched:
-            term.delete()
-    # If term from new term list is not matched with actual terms, create this term
-    for payload_term in payload['terms']:
-        if not payload_term['matched']:
-            Term.objects.create(event=event, day=payload_term["day"], start=payload_term["start"],
-                                end=payload_term["end"], room=payload_term["room"], place=payload_term["place"])
-    terms = event.term_set.all().select_related('room')
-    if event.get_conflicted():
-        terms_conflicts = set()
-        for term in terms:
-            term_conflicts = term.get_conflicted()
-            for conflict in term_conflicts:
-                terms_conflicts.add(conflict)
-        payload = []
-        for term in terms_conflicts:
-            payload.append({"title": term.event.title,
-                            "description": term.event.description,
-                            "author": term.event.author.get_full_name() if event.author else None,
-                            "author_url": _get_event_author_url(term.event.author),
-                            "status": term.event.status,
-                            "type": term.event.type,
-                            "visible": term.event.visible,
-                            "url": term.event.get_absolute_url(),
-                            "start": term.start,
-                            "end": term.end,
-                            "day": term.day,
-                            "room": term.room.number if term.room else None,
-                            "place": term.place})
-        transaction.set_rollback(True)
-        return JsonResponse(payload, safe=False, status=400)
+    for present_term in present_terms:
+        present_term.delete()
+    for new_term in new_terms:
+        new_term.save()
     return JsonResponse({"terms": [{"start": t.start,
                                     "end": t.end,
                                     "day": t.day,
                                     "room": t.room.number if t.room else None,
-                                    "place": t.place} for t in terms],
+                                    "place": t.place} for t in new_terms],
                          "description": event.description,
                          "author": event.author.get_full_name() if event.author else None,
                          "author_url": _get_event_author_url(event.author),
@@ -404,7 +307,7 @@ def events(request):
         data = _check_and_prepare_get_data(request, require_dates=False)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    query = Event.objects.filter().select_related('author', 'event__author')
+    query = Event.objects.filter().select_related('author')
     if data['types']:
         query = query.filter(type__in=data['types'])
     if data['statuses']:
@@ -596,8 +499,8 @@ def display_report(request, form, report_type: 'Literal["table", "doors"]'):  # 
     if semester:
         terms = CourseTerm.objects.filter(
             group__course__semester=semester, classrooms__in=rooms).distinct().select_related(
-                'group__course', 'group__teacher',
-                'group__teacher__user').prefetch_related('classrooms')
+            'group__course', 'group__teacher',
+            'group__teacher__user').prefetch_related('classrooms')
         for term in terms:
             for r in set(term.classrooms.all()) & rooms:
                 events.append(
@@ -618,7 +521,7 @@ def display_report(request, form, report_type: 'Literal["table", "doors"]'):  # 
             same_room_hour_terms = set()
             temp_terms = event.term_set.all()
             for term in temp_terms:
-                if semester_start_day <= term.day <= semester_end_day and term.room in rooms\
+                if semester_start_day <= term.day <= semester_end_day and term.room in rooms \
                         and (term.room, term.start, term.end) not in same_room_hour_terms:
                     same_room_hour_terms.add((term.room, term.start, term.end))
                     terms.append(term)
@@ -640,7 +543,7 @@ def display_report(request, form, report_type: 'Literal["table", "doors"]'):  # 
                                     day__lte=end_date,
                                     room__in=rooms,
                                     event__status=Event.STATUS_ACCEPTED).select_related(
-                                        'room', 'event', 'event__group', 'event__author')
+            'room', 'event', 'event__group', 'event__author')
         for term in terms:
             events.append(
                 ListEvent(date=term.day,

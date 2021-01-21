@@ -75,8 +75,26 @@ class Event(models.Model):
             ("manage_events", "Może zarządzać wydarzeniami"),
         )
 
+    def _authorize_user_can_create_update_event(self):
+        if self.author.has_perm('schedule.manage_events'):
+            return
+        if self.author.student:
+            if not any(self.type == t for t, _ in Event.TYPES_FOR_STUDENT):
+                raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
+            if self.status != Event.STATUS_PENDING:
+                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
+        # Employee can create accepted exam and test events
+        if self.author.employee:
+            if not any(self.type == t for t, _ in Event.TYPES_FOR_TEACHER):
+                raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu')
+            if self.type == Event.TYPE_GENERIC and self.status != Event.STATUS_PENDING:
+                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia')
+
     def clean(self, *args, **kwargs):
         """Overload clean method.
+
+        If this is a new event set proper status and visible field
+        If this is an existing event, check if author can have given type etc. Raises ValidationError
 
         If author is employee and try reserve room for exam - accept it
         If author has perms to manage events - accept it
@@ -119,6 +137,7 @@ class Event(models.Model):
                     from .term import Term
                     for term in Term.objects.filter(event=self):
                         term.clean()
+            self._authorize_user_can_create_update_event()
 
         super(Event, self).clean()
 
@@ -130,14 +149,14 @@ class Event(models.Model):
             term.delete()
         self.delete()
 
-    def get_conflicted(self) -> List['Event']:
-        """Returns all conflicting events."""
+    def get_conflicted(self) -> List['Term']:
+        """Returns all conflicting terms."""
         terms = self.term_set.all()
         event_conflicts = set()
         for term in terms:
             term_conflicts = term.get_conflicted()
             for conflict in term_conflicts:
-                event_conflicts.add(conflict.event)
+                event_conflicts.add(conflict)
         return list(event_conflicts)
 
     # TODO why private and why normal user can't see TYPE_OTHER

@@ -32,7 +32,7 @@ class Term(models.Model):
     ignore_conflicts = models.BooleanField(default=False)
 
     def validate_against_event_terms(self):
-        assert(self.room is not None)
+        assert (self.room is not None)
         terms = Term.get_terms_for_dates(dates=[self.day],
                                          classroom=self.room,
                                          start_time=self.start,
@@ -48,7 +48,7 @@ class Term(models.Model):
                 code='overlap')
 
     def validate_against_course_terms(self):
-        assert(self.room is not None)
+        assert (self.room is not None)
         semester = Semester.get_semester(self.day)
         if not semester:
             return
@@ -91,10 +91,6 @@ class Term(models.Model):
                     code='invalid'
                 )
 
-            if self.day and self.start and self.end and not self.ignore_conflicts:
-                self.validate_against_event_terms()
-                self.validate_against_course_terms()
-
         super(Term, self).clean()
 
     class Meta:
@@ -114,11 +110,20 @@ class Term(models.Model):
                                     Q(day=self.day),
                                     Q(event__status=Event.STATUS_ACCEPTED),
                                     Q(start__lt=self.end),
-                                    Q(end__gt=self.start)) .select_related('event')
+                                    Q(end__gt=self.start)).select_related('event')
 
         if self.pk:
             terms = terms.exclude(pk=self.pk)
         return terms
+
+    def get_conflicted_except_given_terms(self, except_terms):
+        conflict_terms = list(self.get_conflicted())
+        if not conflict_terms:
+            return conflict_terms
+        for except_term in except_terms:
+            if except_term in conflict_terms:
+                conflict_terms.remove(except_term)
+        return conflict_terms
 
     def pretty_print(self):
         """Verbose html info about term.
