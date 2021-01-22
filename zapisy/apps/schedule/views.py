@@ -17,7 +17,6 @@ from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
 from django.urls import reverse
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
 
 from apps.schedule.models.term import Term
 from apps.schedule.models.event import Event
@@ -78,7 +77,7 @@ def terms(request):
         data = _check_and_prepare_get_data(request)
     except ValidationError as err:
         return HttpResponseBadRequest(err)
-    query = Term.objects.filter(day__range=[data['start'], data['end']]).select_related('event', 'event__author')
+    query = Term.objects.order_by().filter(day__range=[data['start'], data['end']]).select_related('event', 'event__author')
     rooms = Classroom.objects.filter(number__in=data['rooms']) if data['rooms'] else None
     if rooms:
         query = query.filter(room__in=rooms)
@@ -97,7 +96,7 @@ def terms(request):
                              Q(event__author__first_name__icontains=last_name) |
                              Q(event__author__last_name__icontains=first_name) |
                              Q(event__author__last_name__icontains=last_name))
-    query = query.filter(event__visible=data['visible'])
+    query = query.filter(event__visible=data['visible']).distinct('event', 'day', 'start', 'end')
     payload = []
     for term in query:
         event = term.event
@@ -114,14 +113,20 @@ def terms(request):
     return JsonResponse(payload, safe=False)
 
 
-def _get_event_author_url(author):
+def _get_event_author_url(author, user):
+    """ Return tuple (author, author_url). If student hid his name and logged user is not employee return empty
+    strings """
     if not author:
-        return ""
+        return "", ""
     if is_employee(author):
         author_url = reverse('employee-profile', args=[author.pk])
     else:
         author_url = reverse('student-profile', args=[author.pk])
-    return author_url
+        student = Student.objects.get(user=author)
+        if not student.consent_granted() and not user.employee:
+            author = None
+            author_url = None
+    return author, author_url
 
 
 # TODO - try to catch 404 error from get_object_or_404
@@ -174,8 +179,6 @@ def _send_conflicts(conflicts, status=200):
     for term in conflicts:
         payload.append({"title": term.event.title,
                         "description": term.event.description,
-                        "author": term.event.author.get_full_name() if term.event.author else None,
-                        "author_url": _get_event_author_url(term.event.author),
                         "status": term.event.status,
                         "type": term.event.type,
                         "visible": term.event.visible,
@@ -191,7 +194,6 @@ def _send_conflicts(conflicts, status=200):
 # Return list of conflicting terms without own terms
 @login_required
 @require_POST
-@csrf_exempt
 def check_conflicts(request, event_id):
     payload = json.loads(request.body)
     try:
@@ -201,6 +203,23 @@ def check_conflicts(request, event_id):
     except ValidationError as err:
         return HttpResponseBadRequest(err)
     return _send_conflicts(conflicts, status=200)
+
+
+def _prepare_create_update_return_dict(event, user, terms):
+    author, author_ulr = _get_event_author_url(event.author, user)
+    return {"terms": [{"start": t.start,
+                                    "end": t.end,
+                                    "day": t.day,
+                                    "room": t.room.number if t.room else None,
+                                    "place": t.place} for t in terms],
+                         "description": event.description,
+                         "author": author.get_full_name() if author else None,
+                         "author_url": author_ulr,
+                         "title": event.title,
+                         "status": event.status,
+                         "type": event.type,
+                         "visible": event.visible,
+                         "url": event.get_absolute_url()}
 
 
 # payload is json, same structure like in GET
@@ -219,25 +238,15 @@ def create_event(request):
         terms = _get_cleaned_terms_list(payload, event=event)
         conflicts = _check_conflicts(terms)
     except ValidationError as err:
+        if err.code == 'permission':
+            return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
     if conflicts:
         return _send_conflicts(conflicts, status=400)
     event.save()
     for term in terms:
         term.save()
-    return JsonResponse({"terms": [{"start": t.start,
-                                    "end": t.end,
-                                    "day": t.day,
-                                    "room": t.room.number if t.room else None,
-                                    "place": t.place} for t in terms],
-                         "description": event.description,
-                         "author": event.author.get_full_name() if event.author else None,
-                         "author_url": _get_event_author_url(event.author),
-                         "title": event.title,
-                         "status": event.status,
-                         "type": event.type,
-                         "visible": event.visible,
-                         "url": event.get_absolute_url()}, status=201)
+    return JsonResponse(_prepare_create_update_return_dict(event, request.user, terms), status=201)
 
 
 @transaction.atomic
@@ -256,6 +265,8 @@ def update_event(request, event_id):
         present_terms = event.term_set.all().select_related('room')
         conflicts = _check_conflicts(new_terms, present_terms=present_terms)
     except ValidationError as err:
+        if err.code == 'permission':
+            return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
     if conflicts:
         return _send_conflicts(conflicts, status=400)
@@ -264,19 +275,7 @@ def update_event(request, event_id):
         present_term.delete()
     for new_term in new_terms:
         new_term.save()
-    return JsonResponse({"terms": [{"start": t.start,
-                                    "end": t.end,
-                                    "day": t.day,
-                                    "room": t.room.number if t.room else None,
-                                    "place": t.place} for t in new_terms],
-                         "description": event.description,
-                         "author": event.author.get_full_name() if event.author else None,
-                         "author_url": _get_event_author_url(event.author),
-                         "title": event.title,
-                         "status": event.status,
-                         "type": event.type,
-                         "visible": event.visible,
-                         "url": event.get_absolute_url()}, status=201)
+    return JsonResponse(_prepare_create_update_return_dict(event, request.user, new_terms), status=201)
 
 
 def _group_terms_same_room(terms):
@@ -298,8 +297,24 @@ def _group_terms_same_room(terms):
     return new_terms
 
 
+def _prepare_events_return_dict(event, user):
+    terms = event.term_set.all().select_related('room')
+    author, author_url = _get_event_author_url(event.author, user)
+    return {"terms": _group_terms_same_room(terms),
+            "description": event.description,
+            "author": author.get_full_name() if author else None,
+            "author_url": author_url,
+            "user_is_author": user == author,
+            "title": event.title,
+            "status": event.status,
+            "type": event.type,
+            "visible": event.visible,
+            "created": event.created,
+            "edited": event.edited,
+            "url": event.get_absolute_url()}
+
+
 @login_required
-@csrf_exempt
 def events(request):
     if request.method == "POST":
         return create_event(request)
@@ -328,33 +343,11 @@ def events(request):
     for event in query:
         if not event._user_can_see_or_404(request.user):
             continue
-        terms = event.term_set.all().select_related('room')
-        author = event.author
-        if is_employee(author):
-            author_url = reverse('employee-profile', args=[author.pk])
-        else:
-            author_url = reverse('student-profile', args=[author.pk])
-            student = Student.objects.get(user=author)
-            if not student.consent_granted() and not request.user.employee:
-                author = None
-                author_url = None
-        payload.append({"terms": _group_terms_same_room(terms),
-                        "description": event.description,
-                        "author": author.get_full_name() if author else None,
-                        "author_url": author_url,
-                        "user_is_author": request.user == author,
-                        "title": event.title,
-                        "status": event.status,
-                        "type": event.type,
-                        "visible": event.visible,
-                        "created": event.created,
-                        "edited": event.edited,
-                        "url": event.get_absolute_url()})
+        payload.append(_prepare_events_return_dict(event, request.user))
     return JsonResponse(payload, safe=False)
 
 
 @login_required
-@csrf_exempt
 @require_POST
 def delete_event(request, event_id):
     event = Event.get_event_or_404(event_id, request.user)
@@ -365,33 +358,11 @@ def delete_event(request, event_id):
 
 
 @login_required
-@csrf_exempt
 def event(request, event_id):
     if request.method == "POST":
         return update_event(request, event_id)
     event = Event.get_event_or_404(event_id, request.user)
-    terms = event.term_set.all().select_related('room')
-    author = event.author
-    if is_employee(author):
-        author_url = reverse('employee-profile', args=[author.pk])
-    else:
-        author_url = reverse('student-profile', args=[author.pk])
-        student = Student.objects.get(user=author)
-        if not student.consent_granted() and not request.user.employee:
-            author = None
-            author_url = None
-    return JsonResponse({"terms": _group_terms_same_room(terms),
-                         "description": event.description,
-                         "author": author.get_full_name() if author else None,
-                         "author_url": author_url,
-                         "user_is_author": request.user == author,
-                         "title": event.title,
-                         "status": event.status,
-                         "type": event.type,
-                         "visible": event.visible,
-                         "created": event.created,
-                         "edited": event.edited,
-                         "url": event.get_absolute_url()})
+    return JsonResponse(_prepare_events_return_dict(event, request.user))
 
 
 class TableReportForm(forms.Form):
