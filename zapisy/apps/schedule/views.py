@@ -8,11 +8,12 @@ from typing import NamedTuple, Optional, List
 
 from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
-from django.shortcuts import get_object_or_404, render
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest, Http404
+from django.shortcuts import render
 from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
 from django.urls import reverse
@@ -34,13 +35,14 @@ def calendar(request):
 
 
 def _check_and_prepare_get_data(request, require_dates=True):
-    """Cast GET query parameters to python objects.
+    """ Cast GET query parameters to python objects.
 
         Args:
             request - GET request.
-            require_dates - when events function calls this method it does not need 'start' and 'end' in request.
+            require_dates - When function 'events' calls this method it does not need 'start' and 'end' in request
+                            parameters.
         Returns:
-                Dictionary with properly casted and validated python objects needed to filter Terms.
+            Dictionary with properly casted and validated python objects needed to filter Terms.
         Raises:
             ValidationError: If require_dates=True and request.GET doesn't have 'start' and 'end' key or
                                 request.GET['start'] or request.GET['end'] don't cast to datetime with proper format.
@@ -77,14 +79,13 @@ def _check_and_prepare_get_data(request, require_dates=True):
 
 @login_required
 def terms(request):
-    """Return list of terms needed for fullcalendar event fetching.
+    """ Return list of Terms info needed for fullcalendar event fetching.
 
         Args:
             request - GET request sent from fullcalendar.
         Returns:
-                JsonResponse with List of Dicts. Single Dict contains info about single term to display in fullcalendar.
-                Single term here contains info from event too: title, status, type etc. This will be shown in
-                fullcalendar.
+            JsonResponse with List of Dicts. Single Dict contains info about single term to display in fullcalendar.
+            Single term here contains info from Event too: title, status, type etc.
     """
     try:
         data = _check_and_prepare_get_data(request)
@@ -128,15 +129,15 @@ def terms(request):
 
 
 def _get_event_author_url(author, user):
-    """Return tuple (author, author_url)
+    """ Return tuple (author, author_url).
 
-        If student hid his name and logged user is not employee return tuple (None, None)
+        If student hid his name and logged user is not employee return tuple (None, None).
 
         Args:
-            author: event author
-            user: logged user
+            author: Event.author
+            user: Logged request.user.
         Returns:
-                Tuple(author: str, author_url: str) or Tuple(author: None, author_url: None)
+            Tuple(author: str, author_url: str) or Tuple(author: None, author_url: None).
     """
     if not author:
         return None, None
@@ -151,19 +152,22 @@ def _get_event_author_url(author, user):
     return author, author_url
 
 
-# TODO - try to catch 404 error from get_object_or_404
 def _get_cleaned_terms_list(payload, event=None):
-    """From given payload return list of Term
+    """ From given payload return List of Terms.
 
-        From payload get list of terms - dictionaries. Payload term may have key 'rooms'. This function make
-        separate Term for every room number in 'rooms'. Term can have only room or place, not both.
-        Run clean() on every Term, but not save(). So it does not change database.
+        From payload get List of Terms - dictionaries. Payload term may have key 'rooms'. This function make
+        separate Term object for every room number in 'rooms'. Term can have only room or place, not both.
+        Runs clean() on every Term, but not save(). So it does not change database.
 
         Args:
-            payload: Dict from POST request body (JSON)
-            event: Create every Term with this event
+            payload: Dict from POST request body (JSON).
+            event: Create every Term with this event.
         Returns:
-                List of Terms
+            List of Terms.
+        Raises:
+            ValidationError: When any Term info miss 'start', 'end' or 'day' key with proper datetime format string.
+                             When any Term miss both 'rooms' and 'place' field.
+                             When any room number in 'rooms' key is not found as proper Classroom object to reserve.
     """
     try:
         payload_terms = payload.get('terms', [])
@@ -177,7 +181,7 @@ def _get_cleaned_terms_list(payload, event=None):
             term.day = datetime.strptime(payload_term['day'], '%Y-%m-%d').date()
             if 'rooms' in payload_term and payload_term['rooms']:
                 for room_number in payload_term['rooms']:
-                    room = get_object_or_404(Classroom, number=room_number)
+                    room = Classroom.objects.get(number=room_number)
                     term.room = room
                     term.place = None
                     term.clean()
@@ -191,21 +195,20 @@ def _get_cleaned_terms_list(payload, event=None):
         if not terms:
             raise ValueError
         return terms
-    except (ValueError, TypeError, KeyError):
+    except (ValueError, TypeError, KeyError, ObjectDoesNotExist):
         raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
 
 
-# TODO catch 404 error from get_object_or_404
 def _check_conflicts(new_terms, present_terms=[]):
-    """Check if new_terms make conflicts with other Terms in database except present_terms
+    """ Check if new_terms make conflicts with other Terms in database except present_terms. Return conflicting Terms.
 
         Args:
-            new_terms: Terms to check if conflicts exists
+            new_terms: Terms to check if conflicts exists.
             present_terms: Ignore conflicts with these Terms. Example usage is when updating Event check if new terms
-                           do not collide with other Terms except self Terms.
+                           do not collide with other Terms except updating Event Terms.
         Returns:
-                List of Dict. Dict contains information about Term and Event that is colliding. Structure od this Dict
-                is inside _send_conflicts function.
+            List of Dict. Single Dict contains information about Term and Event that is colliding.
+            Structure of this Dict is inside _send_conflicts function.
     """
     conflicts_terms = set()
     for new_term in new_terms:
@@ -216,13 +219,13 @@ def _check_conflicts(new_terms, present_terms=[]):
 
 
 def _send_conflicts(conflicts, status=200):
-    """Return JsonResponse with proper conflicts structure and status.
+    """ Return JsonResponse with proper conflicts structure and status.
 
         Args:
-            conflicts: list of Terms
-            status: status of JsonResponse
+            conflicts: list of Terms.
+            status: status of JsonResponse.
         Returns:
-                JsonResponse with List of proper conflicts dict for frontend. Set given status to response.
+            JsonResponse with List of proper conflicts dict for frontend. Set given status to response.
     """
     payload = []
     for term in conflicts:
@@ -242,31 +245,36 @@ def _send_conflicts(conflicts, status=200):
 
 @login_required
 @require_POST
-def check_conflicts(request, event_id):
-    """Return JsonResponse with conflicts, if they don't exists send empty list
+def check_conflicts(request, event_id=None):
+    """ Return JsonResponse with conflicts, if they don't exists send empty list.
 
         Args:
-            request: POST request. Retrieve Terms form request to check their conflicts
+            request: POST request. Retrieve Terms form request to check their conflicts.
             event_id: Id of Event which Terms are checked for collisions. With that given, Terms from request are not
                       colliding with existing Event Terms.
         Returns:
-                JsonResponse with List of conflicts Dict for frontend, may be empty. Set given status to response.
+            JsonResponse with List of conflicts Dict for frontend, this List may be empty. Set given status to response.
     """
     payload = json.loads(request.body)
     try:
-        event = get_object_or_404(Event, id=event_id)
-        conflicts = _check_conflicts(_get_cleaned_terms_list(payload),
-                                     present_terms=event.term_set.all().select_related('room'))
-    except ValidationError as err:
+        if event_id:
+            event = Event.objects.get(id=event_id)
+            conflicts = _check_conflicts(_get_cleaned_terms_list(payload),
+                                         present_terms=event.term_set.all().select_related('room'))
+        else:
+            conflicts = _check_conflicts(_get_cleaned_terms_list(payload))
+    except (ValidationError, ObjectDoesNotExist) as err:
         return HttpResponseBadRequest(err)
     return _send_conflicts(conflicts, status=200)
 
 
-# TODO - probably wrong return Dict, ask if need to group terms and rooms
 def _prepare_create_update_return_dict(event, user, terms):
-    """ Return Dict with proper keys and values for frontend.
+    """ Return Dict with proper keys and values for frontend. Used after successfully creating or updating Event.
 
-        After successfully creating or updating Event this prepares Event with Terms response
+        Args:
+            event: Created or updated Event.
+            user: Logged request.user.
+            terms: List of Terms.
     """
     author, author_ulr = _get_event_author_url(event.author, user)
     return {"terms": [{"start": t.start,
@@ -284,9 +292,16 @@ def _prepare_create_update_return_dict(event, user, terms):
             "url": event.get_absolute_url()}
 
 
-# payload is json, same structure like in GET
 @transaction.atomic
 def create_event(request):
+    """ Create Event with request payload properties. Before creating, Event and Terms are validated.
+
+        Args:
+            request: POST request.
+        Returns:
+            JsonResponse with created Event data. When ValidationError error occurs then HttpResponseForbidden or
+            HttpResponseBadRequest with proper text message.
+    """
     payload = json.loads(request.body)
     event = Event()
     event.title = payload.get('title', '')
@@ -313,6 +328,17 @@ def create_event(request):
 
 @transaction.atomic
 def update_event(request, event_id):
+    """ Update Event with request payload properties. Before updating, Event and Terms are validated.
+
+        Replaces all existing Terms with new created Terms from sent payload.
+
+        Args:
+            request: POST request.
+            event_id: Updating Event id.
+        Returns:
+            JsonResponse with updated Event data. When ValidationError error occurs then HttpResponseForbidden or
+            HttpResponseBadRequest with proper text message.
+    """
     payload = json.loads(request.body)
     try:
         event = Event.get_event_or_404(event_id, request.user)
@@ -340,9 +366,14 @@ def update_event(request, event_id):
     return JsonResponse(_prepare_create_update_return_dict(event, request.user, new_terms), status=201)
 
 
-# Return proper JSON dict for frontend when given List of Terms.
-# Pack same day, start, end terms to one term with 'rooms'
 def _group_terms_same_room(terms):
+    """ Group same date, hours and room terms. Return List of Dict with proper Term info structure for fronted.
+
+        Args:
+            terms: List of Terms.
+        Returns:
+            List of Dict with Term info for fronted.
+    """
     new_terms = []
     for term in terms:
         insert_to_new_terms = True
@@ -362,6 +393,16 @@ def _group_terms_same_room(terms):
 
 
 def _prepare_events_return_dict(event, user):
+    """ Prepare all needed info from Event for fronted. This is not used by fullcalendar.
+
+        Used in 'event' and 'events' function after filtering and validating GET query parameters.
+
+        Args:
+            event: Event to retrieve info for.
+            user: logged request.user.
+        Returns:
+            Event info Dict with proper keys for frontend.
+    """
     terms = event.term_set.all().select_related('room')
     author, author_url = _get_event_author_url(event.author, user)
     return {"terms": _group_terms_same_room(terms),
@@ -380,6 +421,16 @@ def _prepare_events_return_dict(event, user):
 
 @login_required
 def events(request):
+    """ Retrieve many Events or create single Event. This is not used by fullcalendar.
+
+        When request method is GET, get sent query parameters and filter Events. Send only those Events which user can
+        see. When request method is POST, validate if user can create Event with sent JSON properties and create Event.
+
+        Args:
+            request: GET or POST request.
+        Returns:
+            JsonResponse with retrieved Events and Terms or created Event and Terms.
+    """
     if request.method == "POST":
         return create_event(request)
     try:
@@ -413,8 +464,21 @@ def events(request):
 
 @login_required
 @require_POST
+@transaction.atomic
 def delete_event(request, event_id):
-    event = Event.get_event_or_404(event_id, request.user)
+    """ Check if user can delete Event and delete it.
+
+        Args:
+            request: POST request.
+            event_id: Event Id to delete.
+        Returns:
+            HttpResponse when event is deleted. When event is not found HttpResponseBadRequest. When user is not
+            authorized to delete Event HttpResponseForbidden.
+    """
+    try:
+        event = Event.get_event_or_404(event_id, request.user)
+    except Http404:
+        return HttpResponseBadRequest("Event matching query does not exist.")
     if not request.user.has_perm('schedule.manage_events') and event.author != request.user:
         return HttpResponseForbidden('Nie można usuwać wydarzeń nie będąc ich autorem')
     event.delete()
@@ -423,9 +487,23 @@ def delete_event(request, event_id):
 
 @login_required
 def event(request, event_id):
-    if request.method == "POST":
-        return update_event(request, event_id)
-    event = Event.get_event_or_404(event_id, request.user)
+    """ Retrieve single Event or create single Event. This is not used by fullcalendar.
+
+        When request method is GET, send single Event info if logged user can see this event. When request method
+        is POST, validate if user can update Event with sent JSON properties and update Event.
+
+        Args:
+            request: GET or POST request.
+            event_id: Event ID to retrieve or update.
+        Returns:
+            JsonResponse with retrieved Event and Terms or updated Event and Terms.
+    """
+    try:
+        if request.method == "POST":
+            return update_event(request, event_id)
+        event = Event.get_event_or_404(event_id, request.user)
+    except Http404:
+        return HttpResponseBadRequest("Event matching query does not exist.")
     return JsonResponse(_prepare_events_return_dict(event, request.user))
 
 

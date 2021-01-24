@@ -76,6 +76,7 @@ class Event(models.Model):
         )
 
     def _authorize_user_can_create_update_event(self):
+        """ Check if author is authorized to set given Event properties """
         if self.author.has_perm('schedule.manage_events'):
             return
         if self.author.student:
@@ -93,11 +94,13 @@ class Event(models.Model):
     def clean(self, *args, **kwargs):
         """Overload clean method.
 
-        If this is a new event set proper status and visible field
-        If this is an existing event, check if author can have given type etc. Raises ValidationError
+        If this is a new event set proper status and visible field. If author is employee and try reserve room for
+        exam - accept it.
+        If this is an existing event, check if author has permission to set given properties. Specially Event.type and
+        Event.status
 
-        If author is employee and try reserve room for exam - accept it
-        If author has perms to manage events - accept it
+        Raises:
+            ValidationError: If author is not authorized to set given Event properties.
         """
         # if this is a new item
         if not self.pk:
