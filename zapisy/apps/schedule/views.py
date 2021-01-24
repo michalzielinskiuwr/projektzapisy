@@ -152,7 +152,7 @@ def _get_event_author_url(author, user):
     return author, author_url
 
 
-def _get_cleaned_terms_list(payload, event=None):
+def _get_validated_terms(payload, event=None):
     """ From given payload return List of Terms.
 
         From payload get List of Terms - dictionaries. Payload term may have key 'rooms'. This function make
@@ -259,10 +259,10 @@ def check_conflicts(request, event_id=None):
     try:
         if event_id:
             event = Event.objects.get(id=event_id)
-            conflicts = _check_conflicts(_get_cleaned_terms_list(payload),
+            conflicts = _check_conflicts(_get_validated_terms(payload),
                                          present_terms=event.term_set.all().select_related('room'))
         else:
-            conflicts = _check_conflicts(_get_cleaned_terms_list(payload))
+            conflicts = _check_conflicts(_get_validated_terms(payload))
     except (ValidationError, ObjectDoesNotExist) as err:
         return HttpResponseBadRequest(err)
     return _send_conflicts(conflicts, status=200)
@@ -312,7 +312,7 @@ def create_event(request):
     event.type = payload.get('type', Event.TYPE_GENERIC)
     try:
         event.clean()
-        terms = _get_cleaned_terms_list(payload, event=event)
+        terms = _get_validated_terms(payload, event=event)
         conflicts = _check_conflicts(terms)
     except ValidationError as err:
         if err.code == 'permission':
@@ -349,7 +349,7 @@ def update_event(request, event_id):
         event.status = payload.get('status', Event.STATUS_PENDING)
         event.type = payload.get('type', Event.TYPE_GENERIC)
         event.clean()
-        new_terms = _get_cleaned_terms_list(payload, event=event)
+        new_terms = _get_validated_terms(payload, event=event)
         present_terms = event.term_set.all().select_related('room')
         conflicts = _check_conflicts(new_terms, present_terms=present_terms)
     except ValidationError as err:
@@ -393,7 +393,7 @@ def _group_terms_same_room(terms):
 
 
 def _prepare_events_return_dict(event, user):
-    """ Prepare all needed info from Event for fronted. This is not used by fullcalendar.
+    """ Prepare all needed info from Event object for fronted. This is not used by fullcalendar.
 
         Used in 'event' and 'events' function after filtering and validating GET query parameters.
 
