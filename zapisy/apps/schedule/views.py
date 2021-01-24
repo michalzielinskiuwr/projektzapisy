@@ -204,8 +204,7 @@ def _check_conflicts(new_terms, present_terms=[]):
 
         Args:
             new_terms: Terms to check if conflicts exists.
-            present_terms: Ignore conflicts with these Terms. Example usage is when updating Event check if new terms
-                           do not collide with other Terms except updating Event Terms.
+            present_terms: Ignore conflicts with these Terms.
         Returns:
             List of Dict. Single Dict contains information about Term and Event that is colliding.
             Structure of this Dict is inside _send_conflicts function.
@@ -249,7 +248,7 @@ def check_conflicts(request, event_id=None):
     """ Return JsonResponse with conflicts, if they don't exists send empty list.
 
         Args:
-            request: POST request. Retrieve Terms form request to check their conflicts.
+            request: POST request. Retrieve Terms from request to check their conflicts.
             event_id: Id of Event which Terms are checked for collisions. With that given, Terms from request are not
                       colliding with existing Event Terms.
         Returns:
@@ -299,8 +298,8 @@ def create_event(request):
         Args:
             request: POST request.
         Returns:
-            JsonResponse with created Event data. When ValidationError error occurs then HttpResponseForbidden or
-            HttpResponseBadRequest with proper text message.
+            JsonResponse with created Event data. When logged user is not authorized HttpResponseForbidden.
+            When sent payload is not valid HttpResponseBadRequest.
     """
     payload = json.loads(request.body)
     event = Event()
@@ -367,12 +366,12 @@ def update_event(request, event_id):
 
 
 def _group_terms_same_room(terms):
-    """ Group same date, hours and room terms. Return List of Dict with proper Term info structure for fronted.
+    """ Group terms with same date, hours and room. Return List of Dict with proper Term info structure for frontend.
 
         Args:
             terms: List of Terms.
         Returns:
-            List of Dict with Term info for fronted.
+            List of Dict with Term info for frontend.
     """
     new_terms = []
     for term in terms:
@@ -393,7 +392,7 @@ def _group_terms_same_room(terms):
 
 
 def _prepare_events_return_dict(event, user):
-    """ Prepare all needed info from Event object for fronted. This is not used by fullcalendar.
+    """ Prepare all needed info from Event object for frontend. This is not used by fullcalendar.
 
         Used in 'event' and 'events' function after filtering and validating GET query parameters.
 
@@ -423,8 +422,9 @@ def _prepare_events_return_dict(event, user):
 def events(request):
     """ Retrieve many Events or create single Event. This is not used by fullcalendar.
 
-        When request method is GET, get sent query parameters and filter Events. Send only those Events which user can
-        see. When request method is POST, validate if user can create Event with sent JSON properties and create Event.
+        When request method is GET, get sent query parameters and filter Events.
+        Send only these Events that can be seen by a user.
+        When request method is POST, validate if user can create Event with sent JSON properties and create Event.
 
         Args:
             request: GET or POST request.
@@ -466,7 +466,7 @@ def events(request):
 @require_POST
 @transaction.atomic
 def delete_event(request, event_id):
-    """ Check if user can delete Event and delete it.
+    """ Delete Event after authorizing user.
 
         Args:
             request: POST request.
