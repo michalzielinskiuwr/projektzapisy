@@ -311,6 +311,7 @@ def create_event(request):
     event.type = payload.get('type', Event.TYPE_GENERIC)
     try:
         event.clean()
+        event.save()
         terms = _get_validated_terms(payload, event=event)
         conflicts = _check_conflicts(terms)
     except ValidationError as err:
@@ -319,7 +320,6 @@ def create_event(request):
         return HttpResponseBadRequest(err)
     if conflicts:
         return _send_conflicts(conflicts, status=400)
-    event.save()
     for term in terms:
         term.save()
     return JsonResponse(_prepare_create_update_return_dict(event, request.user, terms), status=201)
@@ -348,6 +348,7 @@ def update_event(request, event_id):
         event.status = payload.get('status', Event.STATUS_PENDING)
         event.type = payload.get('type', Event.TYPE_GENERIC)
         event.clean()
+        event.save()
         new_terms = _get_validated_terms(payload, event=event)
         present_terms = event.term_set.all().select_related('room')
         conflicts = _check_conflicts(new_terms, present_terms=present_terms)
@@ -357,7 +358,6 @@ def update_event(request, event_id):
         return HttpResponseBadRequest(err)
     if conflicts:
         return _send_conflicts(conflicts, status=400)
-    event.save()
     for present_term in present_terms:
         present_term.delete()
     for new_term in new_terms:
