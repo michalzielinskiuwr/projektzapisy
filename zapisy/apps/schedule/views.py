@@ -55,7 +55,8 @@ def _check_and_prepare_get_data(request, require_dates=True):
             data['start'] = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
             data['end'] = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
         data['page'] = int(request.GET.get('page', 1))
-        data['visible'] = bool(request.GET.get('visible', True))
+        visible = request.GET.get('visible', None)
+        data['visible'] = bool(visible) if visible is not None else None
         data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
         types = request.GET.get('types', [])
@@ -111,7 +112,9 @@ def terms(request):
                              Q(event__author__first_name__icontains=last_name) |
                              Q(event__author__last_name__icontains=first_name) |
                              Q(event__author__last_name__icontains=last_name))
-    query = query.filter(event__visible=data['visible']).distinct('event', 'day', 'start', 'end')
+    if data['visible'] is not None:
+        query = query.filter(event__visible=data['visible'])
+    query = query.distinct('event', 'day', 'start', 'end')
     payload = []
     for term in query:
         event = term.event
