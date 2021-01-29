@@ -14,7 +14,6 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest, Http404
 from django.shortcuts import render
-from django.template.response import TemplateResponse
 from django.core.validators import ValidationError
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -29,9 +28,8 @@ from apps.users.models import Student, is_employee
 
 @login_required
 def calendar(request):
-    room = None
     rooms = Classroom.get_in_institute(reservation=True)
-    return TemplateResponse(request, 'schedule/calendar.html', locals())
+    return render(request, 'schedule/calendar.html', {"rooms": rooms})
 
 
 def _check_and_prepare_get_data(request, require_dates=True):
@@ -50,32 +48,43 @@ def _check_and_prepare_get_data(request, require_dates=True):
                              If request.GET['types'] are not separated with comma Event.Types like "2,3" or empty.
     """
     data = {}
-    try:
-        if require_dates:
+    if require_dates:
+        try:
             data['start'] = datetime.strptime(request.GET.get('start'), '%Y-%m-%dT%H:%M:%S.%fZ')
             data['end'] = datetime.strptime(request.GET.get('end'), '%Y-%m-%dT%H:%M:%S.%fZ')
-        data['page'] = int(request.GET.get('page', 1))
-        visible = request.GET.get('visible', None)
-        data['visible'] = bool(visible) if visible is not None else None
-        data['place'] = str(request.GET.get('place', ''))
-        data['title_or_author'] = str(request.GET.get('title_author', ''))
+        except KeyError:
+            raise ValidationError('Nie przesłano dat początku i końcu termów.')
+        except ValueError:
+            raise ValidationError('Przesłane daty są złego formatu.')
+    try:
         types = request.GET.get('types', [])
         types = types.split(',') if isinstance(types, str) else types
         for type_ in types:
             if not any(type_ == t for t, _ in Event.TYPES):
                 raise ValueError
         data['types'] = types
+    except ValueError:
+        raise ValidationError('Przesłane typy wydarzeń są nieprawidłowe.')
+    try:
         statuses = request.GET.get('statuses', [])
         statuses = statuses.split(',') if isinstance(statuses, str) else statuses
         for status in statuses:
             if not any(status == s for s, _ in Event.STATUSES):
                 raise ValueError
         data['statuses'] = statuses
+    except ValueError:
+        raise ValidationError('Przesłane statusy wydarzeń są nieprawidłowe.')
+    try:
+        data['page'] = int(request.GET.get('page', 1))
+        visible = request.GET.get('visible', None)
+        data['visible'] = bool(visible) if visible is not None else None
+        data['place'] = str(request.GET.get('place', ''))
+        data['title_or_author'] = str(request.GET.get('title_author', ''))
         rooms = request.GET.get('rooms', [])
         data['rooms'] = rooms.split(',') if rooms else rooms
-        return data
-    except (ValueError, TypeError, KeyError):
-        raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
+    except ValueError as err:
+        raise ValidationError(err)
+    return data
 
 
 @login_required
@@ -175,7 +184,7 @@ def _get_validated_terms(payload, event=None):
     try:
         payload_terms = payload.get('terms', [])
         if not payload_terms:
-            raise ValueError
+            raise ValueError("Missing terms key in payload.")
         terms = []
         for payload_term in payload_terms:
             term = Term(event=event)
@@ -196,10 +205,12 @@ def _get_validated_terms(payload, event=None):
                 term.clean()
                 terms.append(term)
         if not terms:
-            raise ValueError
+            raise ValueError("There are no terms sent in payload.")
         return terms
-    except (ValueError, TypeError, KeyError, ObjectDoesNotExist):
-        raise ValidationError('Przesłane dane są nieprawidłowe lub niewystarczające')
+    except (ValueError, TypeError, ObjectDoesNotExist) as err:
+        raise ValidationError(err)
+    except KeyError as err:
+        raise ValidationError("Missing required term key: " + str(err))
 
 
 def _check_conflicts(new_terms, present_terms=[]):
@@ -278,7 +289,7 @@ def _prepare_create_update_return_dict(event, user, terms):
             user: Logged request.user.
             terms: List of Terms.
     """
-    author, author_ulr = _get_event_author_url(event.author, user)
+    author, author_url = _get_event_author_url(event.author, user)
     return {"terms": [{"start": t.start,
                        "end": t.end,
                        "day": t.day,
@@ -286,7 +297,7 @@ def _prepare_create_update_return_dict(event, user, terms):
                        "place": t.place} for t in terms],
             "description": event.description,
             "author": author.get_full_name() if author else None,
-            "author_url": author_ulr,
+            "author_url": author_url,
             "title": event.title,
             "status": event.status,
             "type": event.type,
@@ -318,16 +329,20 @@ def create_event(request):
         terms = _get_validated_terms(payload, event=event)
         conflicts = _check_conflicts(terms)
     except ValidationError as err:
+        transaction.set_rollback(True)
         if err.code == 'permission':
             return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
     if conflicts:
-        return _send_conflicts(conflicts, status=400)
+        conflicts = _send_conflicts(conflicts, status=400)
+        transaction.set_rollback(True)
+        return conflicts
     for term in terms:
         term.save()
     return JsonResponse(_prepare_create_update_return_dict(event, request.user, terms), status=201)
 
 
+# TODO do not check for conflicts when event.status is changed from ACCEPTED to PENDING or REJECTED
 @transaction.atomic
 def update_event(request, event_id):
     """ Update Event with request payload properties. Before updating, Event and Terms are validated.
@@ -344,23 +359,28 @@ def update_event(request, event_id):
     payload = json.loads(request.body)
     try:
         event = Event.get_event_or_404(event_id, request.user)
-        event.title = payload.get('title', '')
+        current_author = event.author
         event.author = request.user
+        event.title = payload.get('title', '')
         event.description = payload.get('description', '')
         event.visible = payload.get('visible', True)
         event.status = payload.get('status', Event.STATUS_PENDING)
         event.type = payload.get('type', Event.TYPE_GENERIC)
         event.clean()
+        event.author = current_author
         event.save()
         new_terms = _get_validated_terms(payload, event=event)
         present_terms = event.term_set.all().select_related('room')
         conflicts = _check_conflicts(new_terms, present_terms=present_terms)
     except ValidationError as err:
+        transaction.set_rollback(True)
         if err.code == 'permission':
             return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
     if conflicts:
-        return _send_conflicts(conflicts, status=400)
+        conflicts = _send_conflicts(conflicts, status=400)
+        transaction.set_rollback(True)
+        return conflicts
     for present_term in present_terms:
         present_term.delete()
     for new_term in new_terms:
