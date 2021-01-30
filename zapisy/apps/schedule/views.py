@@ -125,7 +125,7 @@ def terms(request):
     payload = []
     for term in query:
         event = term.event
-        if not event._can_user_see(request.user):
+        if not event.can_user_see(request.user):
             continue
         payload.append({"title": event.title,
                         "status": event.status,
@@ -483,7 +483,7 @@ def events(request):
     query = Paginator(query, 20).get_page(data['page'])
     payload = []
     for event in query:
-        if not event._can_user_see(request.user):
+        if not event.can_user_see(request.user):
             continue
         payload.append(_prepare_events_return_dict(event, request.user))
     return JsonResponse(payload, safe=False)

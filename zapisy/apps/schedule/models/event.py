@@ -157,9 +157,8 @@ class Event(models.Model):
                 event_conflicts.add(conflict)
         return list(event_conflicts)
 
-    # TODO why private and why normal user can't see TYPE_OTHER
-    def _can_user_see(self, user):
-        """Private method. Return True if user can see event, otherwise False.
+    def can_user_see(self, user):
+        """Return True if user can see event, otherwise False.
 
         @param user: auth.User
         @return: Boolean
@@ -187,7 +186,7 @@ class Event(models.Model):
         except ObjectDoesNotExist:
             raise Http404
 
-        if event._can_user_see(user):
+        if event.can_user_see(user):
             return event
         else:
             raise Http404
