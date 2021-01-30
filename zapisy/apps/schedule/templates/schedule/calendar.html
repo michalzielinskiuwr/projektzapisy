@@ -5,17 +5,279 @@
 {% block schedule_calendar %} class="active" {% endblock %}
 
 {% block bread %}
-    <li class="breadcrumb-item"><a href="{% url 'main-page' %}">Strona główna</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'schedule:calendar' %}">Sale</a></li>
-    <li class="breadcrumb-item active" aria-current="page">Kalendarz</li>
+<li class="breadcrumb-item"><a href="{% url 'main-page' %}">Strona główna</a></li>
+<li class="breadcrumb-item"><a href="{% url 'schedule:calendar' %}">Sale</a></li>
+<li class="breadcrumb-item active" aria-current="page">Kalendarz</li>
 {% endblock %}
 
 {% block all-content %}
 <h2>{% block calendartitle %} Kalendarz {% endblock %}</h2>
 {% block calendarview %}
 
-<div class="alert alert-info fade show" role="alert">
-    Wybierz daty, sale, jednostki oraz typ wydarzenia do wyświetlenia.
+<div class="alert alert-info fade show">
+    <div class="row">
+        <div class="col-md-8" style="text-align: justify;">
+            Skorzystaj z poniższych filtrów, aby sprecyzować wyszukiwanie wydarzeń. Aby stworzyć wydarzenie,
+            naciśnij przycisk poniżej lub wybierz w kalendarzu termin, w którym chcesz je utworzyć. Szczegółowe
+            informacje ukażą się po wybraniu wydarzenia. Legenda obok przedstawia jaki kolor odpowiada
+            wybranemu typowi. Nazwy w legendzie oznaczone gwiazdką (*) wskazują na to, że dany kolor jest
+            wykorzystywany w otoczce wydarzenia.
+        </div>
+        <div class='col-md-4 my-legend'>
+            <div class='legend-scale'>
+                <ul class='legend-labels'>
+                    <li><span style='background:#539CDB;'></span>Kolokwium</li>
+                    <li><span style='background:#0588FA;'></span>Egzamin</li>
+                    <li><span style='background:#0423B0;'></span>Wydarzenie</li>
+                    <li><span style='background:#223487;'></span>Rezerwacja cykliczna</li>
+                    <li><span style='background:#121F59;'></span>Zajęcia</li>
+                    <li><span style='background:#D3BB5A;'></span>Wydarzenie niewidoczne</li>
+                    <li><span style='background:#0F0;'></span>Zaakceptowane*</li>
+                    <li><span style='background:#FF0;'></span>Oczekujące*</li>
+                    <li><span style='background:#F00;'></span>Odrzucone*</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="reservation" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        {% comment %} User has no permissions to edit the event {% endcomment %}
+        <div v-if="!{{ perms.schedule.manage_events | lower}} && !('{{ user.get_full_name }}' == author) && edit_or_view" class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Informacje o wydarzeniu</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Autor wydarzenia</label>
+                    <input type="text" class="form-control" v-model="author" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label>Nazwa wydarzenia</label>
+                    <input class="form-control" placeholder="Zbieranie grzybów" v-model="name" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label>Opis wydarzenia</label>
+                    <textarea class="form-control" v-model="description" disabled></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Typ wydarzenia</label>
+                    <select v-model="type" class="form-control" disabled>
+                        <option v-for="option in options.type" v-bind:value="option.value">
+                            [[ option.text ]]
+                        </option>
+                    </select>
+                </div>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <td><strong>Dzień</strong></td>
+                            <td><strong>Początek</strong></td>
+                            <td><strong>Koniec</strong></td>
+                            <td><strong>Miejsce</strong></td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(term, index) in terms">
+                            {% comment %}
+                            <td><input disabled class="form-control" type="date" v-model="term.day"></td>
+                            <td><input disabled class="form-control" type="time" v-model="term.start"></td>
+                            <td><input disabled class="form-control" type="time" v-model="term.end"></td>
+                            {% endcomment %}
+                            <td><p>[[ term.day ]]</p></td>
+                            <td><p>[[ term.start ]]</p></td>
+                            <td><p>[[ term.end ]]</p></td>
+                            <td v-if="term.place == '' || term.place == null">
+                                Sale: <p v-for="room in term.rooms" style="display: inline;">[[ room ]] </p>
+                            </td>
+                            <td v-else>
+                                [[ term.place ]]
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div v-else class="modal-content">
+            <div class="modal-header">
+                <h5 v-if="!edit_or_view" class="modal-title">Utwórz wydarzenie</h5>
+                <h5 v-else-if="edit_or_view && {{ perms.schedule.manage_events | lower }} || '{{ user.get_full_name }}' == author">
+                    Edytuj wydarzenie
+                </h5>
+                <h5 v-else class="modal-title">Informacje o wydarzeniu</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" v-if="edit_or_view">
+                    <label>Autor wydarzenia</label>
+                    <input type="text" class="form-control" v-model="author" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label>Nazwa wydarzenia</label>
+                    <input class="form-control" placeholder="Seminarium ANL" v-model="name">
+                </div>
+
+                <div class="form-group">
+                    <label>Opis wydarzenia</label>
+                    <textarea class="form-control" placeholder="Co będzie się działo?" v-model="description"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Wydarzenie widoczne dla wszystkich użytkowników</label>
+                    <select v-model="visible" class="form-control">
+                        <option v-for="option in options.visible" v-bind:value="option.value">
+                            [[ option.text ]]
+                        </option>
+                    </select>
+                </div>
+
+                {% if perms.schedule.manage_events %}
+                <div class="form-group">
+                    <label>Typ wydarzenia</label>
+                    <select v-model="type" class="form-control">
+                        <option v-for="option in options.type" v-bind:value="option.value">
+                            [[ option.text ]]
+                        </option>
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label>Status wydarzenia</label>
+                    {% if perms.schedule.manage_events %}
+                    <select v-model="status" class="form-control">
+                    {% else %}
+                    <select v-model="status" class="form-control" disabled>
+                    {% endif %}
+                        <option v-for="option in options.status" v-bind:value="option.value">
+                            [[ option.text ]]
+                        </option>
+                    </select>
+                </div>
+
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <td><strong>Dzień</strong></td>
+                            <td><strong>Początek</strong></td>
+                            <td><strong>Koniec</strong></td>
+                            <td><strong>Miejsce</strong></td>
+                            <td></td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(term, index) in terms">
+                            <td><input class="form-control" type="date" v-model="term.day"></td>
+                            <td><input class="form-control" type="time" step="60" v-model="term.start"></td>
+                            <td><input class="form-control" type="time" step="60" v-model="term.end"></td>
+                            <td>
+                                <select class="custom-select" size="2" v-model="term.rooms" title="Wybierz sale" multiple>
+                                    {% regroup rooms by get_floor_display as floor_list %}
+                                    <option value="room_none">Miejsce poza II</option>
+                                    {% for floor in floor_list %}
+                                    <optgroup label="{{ floor.grouper }}">
+                                        {% for r in floor.list %}
+                                        <option value="{{ r.number }}">
+                                            {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
+                                        </option>
+                                        {% endfor %}
+                                    </optgroup>
+                                    {% endfor %}
+                                </select>
+                                <div v-if="term.rooms.length === 1 && term.rooms.includes('room_none')">
+                                    <br>
+                                    <input type="text" class="form-control" v-model="term.place"
+                                        placeholder="Sala 13 w IM">
+                                </div>
+                            </td>
+                            <td>
+                                <button v-on:click="remove_term(index);" class="btn btn-danger">Usuń termin</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div>
+                    <button class="btn btn-primary" @click="add_term">Dodaj termin</button>
+                </div>
+            </div>
+            <div class="modal-footer" v-if="edit_or_view">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
+                <button type="button" class="btn btn-danger" @click="remove_from_db(url)">Usuń wydarzenie</button>
+                <button type="button" class="btn btn-success" @click="edit_in_db">Edytuj wydarzenie</button>
+            </div>
+            <div class="modal-footer" v-else>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
+                <button type="button" class="btn btn-success" @click="add_to_db">Utwórz wydarzenie</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="margin-bottom: 10px;" id="filter" class="card bg-light">
+    <div class="card-body">
+        <h5 class="card-title">Filtry (dla Vue, logika dla nich jeszcze niezrobiona)</h5>
+        <div class="row" v-if="!collapsed">
+            <div class="col-md-6">
+                <label>Wybierz sale:</label>
+                <select class="custom-select" v-model="rooms" size="5" multiple>
+                    {% regroup rooms by get_floor_display as floor_list %}
+                    <option value="all" selected>Wszystkie</option>
+                    {% for floor in floor_list %}
+                    <optgroup label="{{ floor.grouper }}">
+                        {% for r in floor.list %}
+                        <option value="{{ r.number }}">
+                            {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label>Miejsce wydarzenia:</label>
+                    <input class="form-control" placeholder="Sala HS w Instytucie Matematyki" v-model="place">
+                </div>
+                <div class="form-group">
+                    <label>Tytuł lub autor wydarzenia:</label>
+                    <input class="form-control" placeholder="Seminarium lub Jan Nowak" v-model="title_or_author">
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <label>Typ wydarzenia:</label> <br>
+                <div class="form-check" v-for="type in options.type">
+                    <input v-model="types" class="form-check-input" type="checkbox" :value="type.value">
+                    <label class="form-check-label">[[ type.text ]]</label>
+                </div>
+            </div>
+        </div>
+
+        {% if perms.schedule.manage_events %}
+        <div class="row" v-if="!collapsed">
+            <div class="col-md-12">
+                <label>Status wydarzenia:</label><br>
+                <div class="form-check form-check-inline" v-for="status in options.status">
+                    <input v-model="statuses" class="form-check-input" type="checkbox" :value="status.value">
+                    <label class="form-check-label">[[ status.text ]]</label>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="card-footer p-1 text-center">
+        <a href="#" @click.prevent="collapsed = !collapsed">Zwiń / Rozwiń</a>
+    </div>
 </div>
 
 <div style="margin-bottom: 10px;">
@@ -23,14 +285,14 @@
         <div class="form-group col-sm-3">
             {% regroup rooms by get_floor_display as floor_list %}
             <label for="room_selector">Wybierz sale:</label>
-            <select class="form-control" id="room_selector" multiple="multiple">
-                <option value="all" selected="selected">Wszystkie</option>
+            <select class="form-control" id="room_selector" multiple>
+                <option value="all" selected>Wszystkie</option>
                 {% for floor in floor_list %}
-                    <optgroup label="{{ floor.grouper }}">
-                        {% for r in floor.list %}
-                            <option value="{{ r.number }}">{{ r.number }}</option>
-                        {% endfor %}
-                    </optgroup>
+                <optgroup label="{{ floor.grouper }}">
+                    {% for r in floor.list %}
+                    <option value="{{ r.number }}">{{ r.number }}</option>
+                    {% endfor %}
+                </optgroup>
                 {% endfor %}
             </select>
         </div>
@@ -58,261 +320,64 @@
                     <label class="form-check-label" for="classes_checkbox">Zajęcia</label>
                 </div>
                 <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" value="" id="other_checkbox">
-                    <label class="form-check-label" for="other_checkbox">Pozostałe</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="checkbox" value="" id="special_reservation_checkbox">
-                    <label class="form-check-label" for="special_reservation_checkbox">Rezerwacja cykliczna/stała</label>
+                    <input class="form-check-input" type="checkbox" value="" id="special_reservation_checkbox" checked>
+                    <label class="form-check-label" for="special_reservation_checkbox">Rezerwacja
+                        cykliczna/stała</label>
                 </div>
             </div>
         </div>
     </div>
 
-    <button type="button" id="create_event_noselect" class="btn btn-success" data-toggle="modal" data-target="#create_event_modal">
+    <button type="button" class="btn btn-success" data-toggle="modal" data-target="#reservation">
         Utwórz wydarzenie
     </button>
-
-    <div class="modal fade" id="create_event_modal" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="create_event_title">Utwórz wydarzenie</h5>
-                    <button type="button" class="close" data-dismiss="modal">
-                        <span>&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <form method="post" action="create_event">
-                        <div class="form-group">
-                            <label for="reservation_name">Nazwa wydarzenia</label>
-                            <input type="text" class="form-control" id="reservation_name" placeholder="Seminarium">
-                        </div>
-                        <div class="form-group">
-                            <label for="reservation_type">Rodzaj wydarzenia</label>
-                            <select class="form-control" id="reservation_type">
-                                <option value="type_event">Wydarzenie</option>
-                                <option value="type_exam">Egzamin</option>
-                                <option value="type_test">Kolokwium</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="reservation_visibility">Wydarzenie widoczne dla wszystkich użytkowników systemu:</label>
-                            <select class="form-control" id="reservation_visibility">
-                                <option value="visible">Tak</option>
-                                <option value="not_visible">Nie</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="reservation_description">Opis wydarzenia</label>
-                            <textarea class="form-control" id="reservation_description" rows="5"></textarea>
-                        </div>
-<!--                        <div class="form-group row">-->
-<!--                            <div class="col-md-2">-->
-<!--                                <label for="reservation_date">Dzień</label>-->
-<!--                                <input type="date" id="reservation_date">-->
-<!--                            </div>-->
-<!--                            <div class="col-md-2">-->
-<!--                                <label for="reservation_time_start">Początek</label>-->
-<!--                                <input type="time" id="reservation_time_start" min="8:00" max="22:00" value="10:00">-->
-<!--                            </div>-->
-<!--                            <div class="col-md-2">-->
-<!--                                <label for="reservation_time_end">Koniec</label>-->
-<!--                                <input type="time" id="reservation_time_end" min="8:00" max="22:00" value="12:00">-->
-<!--                            </div>-->
-<!--                            <div class="col-md-5">-->
-<!--                            <label for="reservation_room">Miejsce wydarzenia</label>-->
-<!--                            <select class="form-control" id="reservation_room" multiple="multiple">-->
-<!--                                <option value="room_none">Miejsce poza Instytutem Informatyki</option>-->
-<!--                                {% for floor in floor_list %}-->
-<!--                                    <optgroup label="{{ floor.grouper }}">-->
-<!--                                        {% for r in floor.list %}-->
-<!--                                            <option value="{{ r.number }}">-->
-<!--                                                {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})-->
-<!--                                            </option>-->
-<!--                                        {% endfor %}-->
-<!--                                    </optgroup>-->
-<!--                                {% endfor %}-->
-<!--                            </select>-->
-<!--                            <div class="form-group" id="reservation_place_div">-->
-<!--                                <br>-->
-<!--                                <input type="text" class="form-control" id="reservation_place" placeholder="Sala 13 w IM">-->
-<!--                            </div>-->
-<!--                        </div>-->
-<!--                        </div>-->
-                        <hr/>
-                        <table class="">
-                            <thead>
-                            <tr>
-                                <th class="">
-                                    <div class="col-md-2">
-                                        <label for="reservation_date">Dzień</label>
-                                        <input type="date" id="reservation_date">
-                                    </div>
-                                </th>
-                                <th class="tg-0lax" rowspan="3">
-                                    <label for="reservation_room">Miejsce wydarzenia</label>
-                                    <select class="form-control" id="reservation_room" multiple="multiple">
-                                        <option value="room_none">Miejsce poza Instytutem Informatyki</option>
-                                        {% for floor in floor_list %}
-                                        <optgroup label="{{ floor.grouper }}">
-                                            {% for r in floor.list %}
-                                            <option value="{{ r.number }}">
-                                                {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
-                                            </option>
-                                            {% endfor %}
-                                        </optgroup>
-                                        {% endfor %}
-                                    </select>
-                                    <div class="form-group" id="reservation_place_div">
-                                        <br>
-                                        <input type="text" class="form-control" id="reservation_place"
-                                               placeholder="Sala 13 w IM">
-                                    </div>
-                                </th>
-                            </tr>
-                            <tr>
-                                <td class="">
-                                    <div class="col-md-2">
-                                        <label for="reservation_time_start">Początek</label>
-                                        <input type="time" id="reservation_time_start" min="8:00" max="22:00"
-                                               value="10:00">
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="">
-                                    <div class="col-md-2">
-                                        <label for="reservation_time_end">Koniec</label>
-                                        <input type="time" id="reservation_time_end" min="8:00" max="22:00"
-                                               value="12:00">
-                                    </div>
-                                </td>
-                            </tr>
-                            </thead>
-                        </table>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="create_event_dismiss">Anuluj</button>
-                    <button type="button" class="btn btn-success" id="create_event_button">Utwórz wydarzenie</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="edit_event_modal" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="edit_event_title">Edytuj wydarzenie</h5>
-                    <button type="button" class="close" data-dismiss="modal">
-                        <span>&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div>
-                        <div class="form-group">
-                            <label for="edit_reservation_author">Autor wydarzenia</label>
-                            <input type="text" class="form-control" id="edit_reservation_author" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_reservation_name">Nazwa wydarzenia</label>
-                            <input type="text" class="form-control" id="edit_reservation_name">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_reservation_type">Rodzaj wydarzenia</label>
-                            <select class="form-control" id="edit_reservation_type">
-                                <option value="type_event">Wydarzenie</option>
-                                <option value="type_exam">Egzamin</option>
-                                <option value="type_test">Kolokwium</option>
-                                <option value="type_special_reservation">Rezerwacja cykliczna</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_reservation_visibility">Wydarzenie widoczne dla wszystkich użytkowników systemu:</label>
-                            <select class="form-control" id="edit_reservation_visibility">
-                                <option value="visible">Tak</option>
-                                <option value="not_visible">Nie</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_reservation_status">Status wydarzenia:</label>
-                            <select class="form-control" id="edit_reservation_status">
-                                <option value="pending">Oczekujące</option>
-                                <option value="accepted">Zaakceptowane</option>
-                                <option value="rejected">Odrzucone</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="edit_reservation_description">Opis wydarzenia</label>
-                            <textarea class="form-control" id="edit_reservation_description" rows="5"></textarea>
-                        </div>
-                        <hr/>
-                        <table class="">
-                            <thead>
-                            <tr>
-                                <th class="">
-                                    <div class="col-md-2">
-                                        <label for="edit_reservation_date">Dzień</label>
-                                        <input type="date" id="edit_reservation_date">
-                                    </div>
-                                </th>
-                                <th class="tg-0lax" rowspan="3">
-                                    <label for="edit_reservation_room">Miejsce wydarzenia</label>
-                                    <select class="form-control" id="edit_reservation_room" multiple="multiple">
-                                        <option value="room_none">Miejsce poza Instytutem Informatyki</option>
-                                        {% for floor in floor_list %}
-                                        <optgroup label="{{ floor.grouper }}">
-                                            {% for r in floor.list %}
-                                            <option value="{{ r.number }}">
-                                                {{ r.number }} ({{ r.capacity }} miejsc, {{ r.get_type_display }})
-                                            </option>
-                                            {% endfor %}
-                                        </optgroup>
-                                        {% endfor %}
-                                    </select>
-                                    <div class="form-group" id="edit_reservation_place_div">
-                                        <br>
-                                        <input type="text" class="form-control" id="edit_reservation_place"
-                                               placeholder="Sala 13 w IM">
-                                    </div>
-                                </th>
-                            </tr>
-                            <tr>
-                                <td class="">
-                                    <div class="col-md-2">
-                                        <label for="edit_reservation_time_start">Początek</label>
-                                        <input type="time" id="edit_reservation_time_start" min="8:00" max="22:00" step="60"
-                                               value="10:00">
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="">
-                                    <div class="col-md-2">
-                                        <label for="edit_reservation_time_end">Koniec</label>
-                                        <input type="time" id="edit_reservation_time_end" min="8:00" max="22:00" step="60"
-                                               value="12:00">
-                                    </div>
-                                </td>
-                            </tr>
-                            </thead>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="edit_event_dismiss">Anuluj</button>
-                    <button type="button" class="btn btn-danger" id="edit_event_delete">Usuń wydarzenie</button>
-                    <button type="button" class="btn btn-success" id="edit_event_button">Zaakceptuj zmiany</button>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 {% render_bundle 'schedule-fullcalendar' %}
 <div id='calendar'></div>
+
+<style type='text/css'>
+  .my-legend .legend-title {
+    text-align: left;
+    margin-bottom: 5px;
+    font-weight: bold;
+    font-size: 90%;
+    }
+  .my-legend .legend-scale ul {
+    columns: 2;
+    -webkit-columns: 2;
+    -moz-columns: 2;
+    margin: 0;
+    margin-bottom: 5px;
+    padding: 0;
+    float: left;
+    list-style: none;
+    }
+  .my-legend .legend-scale ul li {
+    font-size: 80%;
+    list-style: none;
+    margin-left: 0;
+    line-height: 18px;
+    margin-bottom: 2px;
+    }
+  .my-legend ul.legend-labels li span {
+    display: block;
+    float: left;
+    height: 16px;
+    width: 30px;
+    margin-right: 5px;
+    margin-left: 0;
+    border: 1px solid #999;
+    }
+  .my-legend .legend-source {
+    font-size: 70%;
+    color: #999;
+    clear: both;
+    }
+  .my-legend a {
+    color: #777;
+    }
+</style>
 
 {% endblock calendarview %}
 {% endblock all-content %}

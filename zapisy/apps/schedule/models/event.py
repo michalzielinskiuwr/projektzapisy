@@ -71,6 +71,7 @@ class Event(models.Model):
         )
 
     def _authorize_user_can_create_update_event(self):
+        """ Check if author is authorized to set given Event properties """
         if self.author.has_perm('schedule.manage_events'):
             return
         if self.author.student:
@@ -88,11 +89,13 @@ class Event(models.Model):
     def clean(self, *args, **kwargs):
         """Overload clean method.
 
-        If this is a new event set proper status and visible field
-        If this is an existing event, check if author can have given type etc. Raises ValidationError
+        If this is a new event set proper status and visible field. If author is employee and try reserve room for
+        exam - accept it.
+        If this is an existing event, check if author has permission to set given properties. Specially Event.type and
+        Event.status
 
-        If author is employee and try reserve room for exam - accept it
-        If author has perms to manage events - accept it
+        Raises:
+            ValidationError: If author is not authorized to set given Event properties.
         """
         # if this is a new item
         if not self.pk:
@@ -154,9 +157,8 @@ class Event(models.Model):
                 event_conflicts.add(conflict)
         return list(event_conflicts)
 
-    # TODO why private and why normal user can't see TYPE_OTHER
-    def _user_can_see_or_404(self, user):
-        """Private method. Return True if user can see event, otherwise False.
+    def can_user_see(self, user):
+        """Return True if user can see event, otherwise False.
 
         @param user: auth.User
         @return: Boolean
@@ -184,7 +186,7 @@ class Event(models.Model):
         except ObjectDoesNotExist:
             raise Http404
 
-        if event._user_can_see_or_404(user):
+        if event.can_user_see(user):
             return event
         else:
             raise Http404
