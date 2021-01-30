@@ -1,6 +1,6 @@
 import copy
 import json
-import operator
+from operator import attrgetter, itemgetter
 from datetime import datetime, timedelta
 from itertools import groupby
 from typing import NamedTuple, Optional, List
@@ -22,13 +22,23 @@ from apps.schedule.models.event import Event
 from apps.enrollment.courses.models.classroom import Classroom
 from apps.enrollment.courses.models.semester import Semester
 from apps.enrollment.courses.models.term import Term as CourseTerm
-from apps.users.models import Student, is_employee
+from apps.users.models import Student, is_employee, is_student
 
 
 @login_required
 def calendar(request):
     rooms = Classroom.get_in_institute(reservation=True)
-    return render(request, 'schedule/calendar.html', {"rooms": rooms})
+    new_rooms = [{"number": r.number,
+                  "floor": r.floor,
+                  "capacity": r.capacity,
+                  "type": r.get_type_display()} for r in rooms]
+    new_rooms = sorted(new_rooms, key=itemgetter('floor', 'number'))
+    return render(request, 'schedule/calendar.html', {"rooms": rooms,
+                                                      "new_rooms": new_rooms,
+                                                      "user_full_name": request.user.get_full_name(),
+                                                      "is_student": is_student(request.user),
+                                                      "is_employee": is_employee(request.user),
+                                                      "is_admin": request.user.has_perm('schedule.manage_events')})
 
 
 def _check_and_prepare_get_data(request, require_dates=True):
@@ -77,6 +87,8 @@ def _check_and_prepare_get_data(request, require_dates=True):
         data['page'] = int(request.GET.get('page', 1))
         visible = request.GET.get('visible', None)
         data['visible'] = bool(visible) if visible is not None else None
+        ignore_conflicts = request.GET.get('ignore_conflicts', None)
+        data['ignore_conflicts'] = bool(ignore_conflicts) if ignore_conflicts is not None else None
         data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
         rooms = request.GET.get('rooms', [])
@@ -121,6 +133,8 @@ def terms(request):
                              Q(event__author__last_name__icontains=last_name))
     if data['visible'] is not None:
         query = query.filter(event__visible=data['visible'])
+    if data['ignore_conflicts'] is not None:
+        query = query.filter(ignore_conflicts=data['ignore_conflicts'])
     query = query.distinct('event', 'day', 'start', 'end')
     payload = []
     for term in query:
@@ -131,6 +145,7 @@ def terms(request):
                         "status": event.status,
                         "type": event.type,
                         "visible": event.visible,
+                        "ignore_conflicts": term.ignore_conflicts,
                         "url": event.get_absolute_url(),
                         "user_is_author": request.user == event.author,
                         "start": datetime.combine(term.day, term.start).isoformat(),
@@ -200,6 +215,7 @@ def _get_validated_terms(payload, event=None):
                 for room_number in payload_term['rooms']:
                     term.room = rooms[room_number]
                     term.place = None
+                    term.ignore_conflicts = any(r == room_number for r in payload_term['ignore_conflicts_rooms'])
                     term.clean()
                     terms.append(term)
                     term = copy.deepcopy(term)
@@ -229,6 +245,8 @@ def _check_conflicts(new_terms, present_terms=[]):
     """
     conflicts_terms = set()
     for new_term in new_terms:
+        if new_term.ignore_conflicts:
+            continue
         temp_conflicts = new_term.get_conflicted_except_given_terms(present_terms)
         for conflict in temp_conflicts:
             conflicts_terms.add(conflict)
@@ -298,6 +316,7 @@ def _prepare_create_update_return_dict(event, user, terms):
                        "end": t.end,
                        "day": t.day,
                        "room": t.room.number if t.room else None,
+                       "ignore_conflicts": t.ignore_conflicts,
                        "place": t.place} for t in terms],
             "description": event.description,
             "author": author.get_full_name() if author else None,
@@ -407,6 +426,8 @@ def _group_terms_same_room(terms):
             if term.start == new_term["start"] and term.end == new_term["end"] and term.day == new_term["day"] \
                     and term.place is None and new_term["place"] is None:
                 new_term["rooms"].append(term.room.number)
+                if term.ignore_conflicts:
+                    new_term["ignore_conflicts_rooms"].append(term.room.number)
                 insert_to_new_terms = False
                 break
         if insert_to_new_terms:
@@ -414,6 +435,7 @@ def _group_terms_same_room(terms):
                               "end": term.end,
                               "day": term.day,
                               "rooms": [term.room.number] if term.room else None,
+                              "ignore_conflicts_rooms": [term.room.number] if term.ignore_conflicts else [],
                               "place": term.place})
     return new_terms
 
@@ -637,10 +659,10 @@ def display_report(request, form, report_type: 'Literal["table", "doors"]'):  # 
                           if term.event.group else term.event.get_type_display(),
                           author=term.event.author.get_full_name()))
     if report_type == 'table':
-        events = sorted(events, key=operator.attrgetter('room.id', 'date', 'begin'))
+        events = sorted(events, key=attrgetter('room.id', 'date', 'begin'))
     else:
-        events = sorted(events, key=operator.attrgetter('room.id', 'weekday', 'begin'))
-    terms_by_room = groupby(events, operator.attrgetter('room.number'))
+        events = sorted(events, key=attrgetter('room.id', 'weekday', 'begin'))
+    terms_by_room = groupby(events, attrgetter('room.number'))
     terms_by_room = sorted([(int(k), list(g)) for k, g in terms_by_room])
 
     return render(request, f'schedule/reports/report_{report_type}.html', {

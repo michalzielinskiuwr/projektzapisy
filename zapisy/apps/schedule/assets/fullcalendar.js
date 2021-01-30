@@ -295,7 +295,8 @@ const reservation = new Vue({
                 start: "",
                 end: "",
                 place: "",
-                rooms: []
+                rooms: [],
+                ignore_conflicts_rooms: []
             });
         },
 
