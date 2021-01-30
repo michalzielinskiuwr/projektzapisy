@@ -356,7 +356,7 @@ def create_event(request):
         if err.code == 'permission':
             return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
-    if conflicts:
+    if conflicts and event.status != Event.STATUS_REJECTED:
         conflicts = _send_conflicts(conflicts, status=400)
         transaction.set_rollback(True)
         return conflicts
@@ -365,7 +365,6 @@ def create_event(request):
     return JsonResponse(_prepare_create_update_return_dict(event, request.user, terms), status=201)
 
 
-# TODO do not check for conflicts when event.status is changed from ACCEPTED to PENDING or REJECTED
 @transaction.atomic
 def update_event(request, event_id):
     """ Update Event with request payload properties. Before updating, Event and Terms are validated.
@@ -400,7 +399,7 @@ def update_event(request, event_id):
         if err.code == 'permission':
             return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
-    if conflicts:
+    if conflicts and event.status != Event.STATUS_REJECTED:
         conflicts = _send_conflicts(conflicts, status=400)
         transaction.set_rollback(True)
         return conflicts
