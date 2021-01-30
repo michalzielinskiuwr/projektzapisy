@@ -47,7 +47,7 @@ async function fetchEvents(fetchInfo) {
     url.searchParams.set("end", fetchInfo.end.toISOString());
 
     let room_id = $('#room_selector').val();
-    if (room_id === "all")
+    if (room_id == "all")
         url.searchParams.delete('rooms');
     else
         url.searchParams.set("rooms", [room_id]);

@@ -1,12 +1,10 @@
 import copy
 import json
 import operator
-from collections import defaultdict
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from itertools import groupby
 from typing import NamedTuple, Optional, List
 
-from django import forms
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
@@ -18,9 +16,10 @@ from django.core.validators import ValidationError
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from apps.schedule.forms import DoorChartForm, TableReportForm
 from apps.schedule.models.term import Term
 from apps.schedule.models.event import Event
-from apps.enrollment.courses.models.classroom import Classroom, Floors
+from apps.enrollment.courses.models.classroom import Classroom
 from apps.enrollment.courses.models.semester import Semester
 from apps.enrollment.courses.models.term import Term as CourseTerm
 from apps.users.models import Student, is_employee
@@ -103,9 +102,8 @@ def terms(request):
         return HttpResponseBadRequest(err)
     query = Term.objects.order_by().filter(day__range=[data['start'], data['end']]).select_related('event',
                                                                                                    'event__author')
-    rooms = Classroom.objects.filter(number__in=data['rooms']) if data['rooms'] else None
-    if rooms:
-        query = query.filter(room__in=rooms)
+    if data['rooms']:
+        query = query.filter(room__number__in=data['rooms'])
     if data['place']:
         query = query.filter(place=data['place'])
     if data['types']:
@@ -127,7 +125,7 @@ def terms(request):
     payload = []
     for term in query:
         event = term.event
-        if not event._user_can_see_or_404(request.user):
+        if not event._can_user_see(request.user):
             continue
         payload.append({"title": event.title,
                         "status": event.status,
@@ -159,7 +157,7 @@ def _get_event_author_url(author, user):
         author_url = reverse('student-profile', args=[author.pk])
         student = Student.objects.get(user=author)
         if not student.consent_granted() and not user.employee:
-            author = None
+            author = "Student ukryty"
             author_url = None
     return author, author_url
 
@@ -181,20 +179,26 @@ def _get_validated_terms(payload, event=None):
                              When any Term miss both 'rooms' and 'place' field.
                              When any room number in 'rooms' key is not found as proper Classroom object to reserve.
     """
+
+    payload_terms = payload.get('terms', [])
+    if not payload_terms:
+        raise ValidationError("Missing terms key in payload.")
+    rooms_to_query = set()
+    for payload_term in payload_terms:
+        if 'rooms' in payload_term and payload_term['rooms']:
+            for room_number in payload_term['rooms']:
+                rooms_to_query.add(room_number)
+    rooms = {room.number: room for room in Classroom.objects.filter(number__in=rooms_to_query)}
+    terms = []
     try:
-        payload_terms = payload.get('terms', [])
-        if not payload_terms:
-            raise ValueError("Missing terms key in payload.")
-        terms = []
         for payload_term in payload_terms:
-            term = Term(event=event)
-            term.start = datetime.strptime(payload_term['start'], '%H:%M').time()
-            term.end = datetime.strptime(payload_term['end'], '%H:%M').time()
-            term.day = datetime.strptime(payload_term['day'], '%Y-%m-%d').date()
+            term = Term(event=event,
+                        start=datetime.strptime(payload_term['start'], '%H:%M').time(),
+                        end=datetime.strptime(payload_term['end'], '%H:%M').time(),
+                        day=datetime.strptime(payload_term['day'], '%Y-%m-%d').date())
             if 'rooms' in payload_term and payload_term['rooms']:
                 for room_number in payload_term['rooms']:
-                    room = Classroom.objects.get(number=room_number)
-                    term.room = room
+                    term.room = rooms[room_number]
                     term.place = None
                     term.clean()
                     terms.append(term)
@@ -479,7 +483,7 @@ def events(request):
     query = Paginator(query, 20).get_page(data['page'])
     payload = []
     for event in query:
-        if not event._user_can_see_or_404(request.user):
+        if not event._can_user_see(request.user):
             continue
         payload.append(_prepare_events_return_dict(event, request.user))
     return JsonResponse(payload, safe=False)
@@ -505,7 +509,7 @@ def delete_event(request, event_id):
     if not request.user.has_perm('schedule.manage_events') and event.author != request.user:
         return HttpResponseForbidden('Nie można usuwać wydarzeń nie będąc ich autorem')
     event.delete()
-    return HttpResponse("Event deleted", status=200)
+    return HttpResponse("Usunięto wydarzenie", status=200)
 
 
 @login_required
@@ -528,59 +532,6 @@ def event(request, event_id):
     except Http404:
         return HttpResponseBadRequest("Event matching query does not exist.")
     return JsonResponse(_prepare_events_return_dict(event, request.user))
-
-
-class TableReportForm(forms.Form):
-    """Form for generating table-based events report."""
-    today = date.today().isoformat()
-    beg_date = forms.DateField(
-        label='Od:',
-        widget=forms.TextInput(
-            attrs={
-                'type': 'date',
-                'class': 'form-control',
-                'value': today}))
-    end_date = forms.DateField(
-        label='Do:',
-        widget=forms.TextInput(
-            attrs={
-                'type': 'date',
-                'class': 'form-control',
-                'value': today}))
-    rooms = forms.MultipleChoiceField()
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        classrooms = Classroom.objects.filter(can_reserve=True)
-        by_floor = defaultdict(list)
-        floor_names = dict(Floors.choices)
-        for r in classrooms:
-            by_floor[floor_names[r.floor]].append((r.pk, r.number))
-        self.fields['rooms'].choices = by_floor.items()
-
-
-class DoorChartForm(forms.Form):
-    """Form for generating door event charts."""
-    today = date.today().isoformat()
-    rooms = forms.MultipleChoiceField()
-    week = forms.CharField(max_length=10, widget=forms.Select())
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        classrooms = Classroom.objects.filter(can_reserve=True)
-        by_floor = defaultdict(list)
-        floor_names = dict(Floors.choices)
-        for r in classrooms:
-            by_floor[floor_names[r.floor]].append((r.pk, r.number))
-        self.fields['rooms'].choices = by_floor.items()
-
-        semester = Semester.get_current_semester()
-        next_sem = Semester.get_upcoming_semester()
-        weeks = [(week[0], f"{week[0]} - {week[1]}") for week in semester.get_all_weeks()]
-        if semester != next_sem:
-            weeks.insert(0, ('nextsem', f"Generuj z planu zajęć dla semestru '{next_sem}'"))
-        weeks.insert(0, ('currsem', f"Generuj z planu zajęć dla semestru '{semester}'"))
-        self.fields['week'].widget.choices = weeks
 
 
 @login_required
