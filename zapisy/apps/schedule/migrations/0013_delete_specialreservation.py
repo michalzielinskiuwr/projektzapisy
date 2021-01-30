@@ -7,12 +7,10 @@ def add_title(apps, schema_editor):
     events = Event.objects.filter(type__in=['0', '1'])
     print(events)
     for event in events:
-        print("in for")
         if event.course != None:
             event.title = event.course.name
         else:
             event.title = event.description
-        print(event.title)
         event.save()
 
 class Migration(migrations.Migration):
