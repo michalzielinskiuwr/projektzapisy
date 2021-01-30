@@ -10,7 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest, Http404
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import render
 from django.core.validators import ValidationError
 from django.urls import reverse
@@ -502,10 +502,7 @@ def delete_event(request, event_id):
             HttpResponse when event is deleted. When event is not found HttpResponseBadRequest. When user is not
             authorized to delete Event HttpResponseForbidden.
     """
-    try:
-        event = Event.get_event_or_404(event_id, request.user)
-    except Http404:
-        return HttpResponseBadRequest("Event matching query does not exist.")
+    event = Event.get_event_or_404(event_id, request.user)
     if not request.user.has_perm('schedule.manage_events') and event.author != request.user:
         return HttpResponseForbidden('Nie można usuwać wydarzeń nie będąc ich autorem')
     event.delete()
@@ -525,12 +522,9 @@ def event(request, event_id):
         Returns:
             JsonResponse with retrieved Event and Terms or updated Event and Terms.
     """
-    try:
-        if request.method == "POST":
-            return update_event(request, event_id)
-        event = Event.get_event_or_404(event_id, request.user)
-    except Http404:
-        return HttpResponseBadRequest("Event matching query does not exist.")
+    if request.method == "POST":
+        return update_event(request, event_id)
+    event = Event.get_event_or_404(event_id, request.user)
     return JsonResponse(_prepare_events_return_dict(event, request.user))
 
 
