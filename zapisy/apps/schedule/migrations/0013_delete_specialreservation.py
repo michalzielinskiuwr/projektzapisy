@@ -2,6 +2,18 @@
 
 from django.db import migrations
 
+def add_title(apps, schema_editor):
+    Event = apps.get_model('schedule', 'Event')
+    events = Event.objects.filter(type__in=['0', '1'])
+    print(events)
+    for event in events:
+        print("in for")
+        if event.course != None:
+            event.title = event.course.name
+        else:
+            event.title = event.description
+        print(event.title)
+        event.save()
 
 class Migration(migrations.Migration):
 
@@ -12,5 +24,8 @@ class Migration(migrations.Migration):
     operations = [
         migrations.DeleteModel(
             name='SpecialReservation',
+        ),
+        migrations.RunPython(
+            add_title
         ),
     ]
