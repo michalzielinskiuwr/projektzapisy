@@ -178,8 +178,8 @@ def _get_validated_terms(payload: Dict[str, str or List[Dict]], event: Event = N
     """Returns list of validated Terms created from given payload.
 
     Payload has terms info to create, but terms that differ only in room number
-    are sent as single term with rooms key. This function creates (but not saves)
-    separate Term for every room as stored in database.
+    are sent as single term with 'rooms' key. This function creates
+    (but not saves) separate Term for every room as stored in database.
 
     Args:
         payload: Converted JSON from POST request body.
@@ -309,6 +309,9 @@ def check_conflicts(request, event_id: int or None = None) -> JsonResponse:
 
 def _group_terms_same_date_and_time(terms: List[Term]) -> List[Dict]:
     """Group Terms that occur at same date and time.
+
+    Terms that differ only in room number are grouped as single term Dict
+    with 'rooms' key.
 
     Returns:
         List of Dict with proper Term info and structure for frontend.
