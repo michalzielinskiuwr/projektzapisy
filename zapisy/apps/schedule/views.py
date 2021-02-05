@@ -35,10 +35,11 @@ def calendar(request):
     new_rooms = sorted(new_rooms, key=itemgetter('floor', 'number'))
     return render(request, 'schedule/calendar.html', {"rooms": rooms,
                                                       "new_rooms": new_rooms,
-                                                      "user_full_name": request.user.get_full_name(),
-                                                      "is_student": is_student(request.user),
-                                                      "is_employee": is_employee(request.user),
-                                                      "is_admin": request.user.has_perm('schedule.manage_events')})
+                                                      "user_info": {
+                                                          "full_name": request.user.get_full_name(),
+                                                          "is_student": is_student(request.user),
+                                                          "is_employee": is_employee(request.user),
+                                                          "is_admin": request.user.has_perm('schedule.manage_events')}})
 
 
 def _check_and_prepare_get_data(request, require_dates: bool = True
@@ -332,7 +333,7 @@ def _group_terms_same_date_and_time(terms: List[Term]) -> List[Dict]:
                               "end": term.end,
                               "day": term.day,
                               "rooms": [term.room.number] if term.room else None,
-                              "ignore_conflicts_rooms": [term.room.number] if term.ignore_conflicts else [],
+                              "ignore_conflicts_rooms": [term.room.number] if term.room and term.ignore_conflicts else [],
                               "place": term.place})
     return new_terms
 
