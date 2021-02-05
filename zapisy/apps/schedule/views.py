@@ -181,6 +181,7 @@ def _get_validated_terms(payload: Dict[str, str or List[Dict]], event: Event = N
     Payload has terms info to create, but terms that differ only in room number
     are sent as single term with 'rooms' key. This function creates
     (but not saves) separate Term for every room as stored in database.
+    Checks if created Terms do not collide with themselves,
 
     Args:
         payload: Converted JSON from POST request body.
@@ -216,13 +217,16 @@ def _get_validated_terms(payload: Dict[str, str or List[Dict]], event: Event = N
                     term.clean()
                     terms.append(term)
                     term = copy.deepcopy(term)
-            else:
+            if 'place' in payload_term and payload_term['place']:
                 term.room = None
                 term.place = payload_term['place']
                 term.clean()
                 terms.append(term)
         if not terms:
             raise ValueError("There are no terms sent in payload.")
+        if any(t_x.room == t_y.room and t_x.day == t_y.day and t_x.start < t_y.end and t_x.end > t_y.start and
+               t_x.room and t_y.room and t_x != t_y for t_x in terms for t_y in terms):
+            raise ValidationError("Created Terms collide with themselves.")
         return terms
     except (ValueError, TypeError, ObjectDoesNotExist) as err:
         raise ValidationError(err)
@@ -312,30 +316,37 @@ def _group_terms_same_date_and_time(terms: List[Term]) -> List[Dict]:
     """Group Terms that occur at same date and time.
 
     Terms that differ only in room number are grouped as single term Dict
-    with 'rooms' key.
+    with 'rooms' key. If Terms differ only in place, create separate term Dicts.
 
     Returns:
         List of Dict with proper Term info and structure for frontend.
     """
-    new_terms = []
+    grouped_terms = []
     for term in terms:
-        insert_to_new_terms = True
-        for new_term in new_terms:
-            if term.start == new_term["start"] and term.end == new_term["end"] and term.day == new_term["day"] \
-                    and term.place is None and new_term["place"] is None:
-                new_term["rooms"].append(term.room.number)
+        insert_to_grouped_terms = True
+        for grouped_term in grouped_terms:
+            if term.start == grouped_term["start"] and term.end == grouped_term["end"] \
+                    and term.day == grouped_term["day"]:
+                if term.place and grouped_term["place"]:
+                    break
+                if term.place and not grouped_term["place"]:
+                    grouped_term["place"] = term.place
+                    insert_to_grouped_terms = False
+                    break
+                grouped_term["rooms"].append(term.room.number)
                 if term.ignore_conflicts:
-                    new_term["ignore_conflicts_rooms"].append(term.room.number)
-                insert_to_new_terms = False
+                    grouped_term["ignore_conflicts_rooms"].append(term.room.number)
+                insert_to_grouped_terms = False
                 break
-        if insert_to_new_terms:
-            new_terms.append({"start": term.start,
-                              "end": term.end,
-                              "day": term.day,
-                              "rooms": [term.room.number] if term.room else None,
-                              "ignore_conflicts_rooms": [term.room.number] if term.room and term.ignore_conflicts else [],
-                              "place": term.place})
-    return new_terms
+        if insert_to_grouped_terms:
+            grouped_terms.append({"start": term.start,
+                                  "end": term.end,
+                                  "day": term.day,
+                                  "rooms": [term.room.number] if term.room else [],
+                                  "ignore_conflicts_rooms": [
+                                      term.room.number] if term.room and term.ignore_conflicts else [],
+                                  "place": term.place})
+    return grouped_terms
 
 
 def _get_event_info_to_send(event: Event, user: 'request.user') -> Dict[str, str or List[Dict]]:
@@ -386,7 +397,7 @@ def create_event(request) -> JsonResponse:
         conflicts = _check_conflicts(terms)
     except ValidationError as err:
         transaction.set_rollback(True)
-        if err.code == 'permission':
+        if hasattr(err, 'code') and err.code == 'permission':
             return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
     if conflicts and event.status != Event.STATUS_REJECTED:
@@ -430,7 +441,7 @@ def update_event(request, event_id: int) -> JsonResponse:
         conflicts = _check_conflicts(new_terms, ignore_terms=present_terms)
     except ValidationError as err:
         transaction.set_rollback(True)
-        if err.code == 'permission':
+        if hasattr(err, 'code') and err.code == 'permission':
             return HttpResponseForbidden(err)
         return HttpResponseBadRequest(err)
     if conflicts and event.status != Event.STATUS_REJECTED:

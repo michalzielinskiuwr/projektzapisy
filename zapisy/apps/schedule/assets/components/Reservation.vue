@@ -123,19 +123,41 @@
               <thead>
               <tr>
                 <td class="align-middle"><strong>Dzień</strong></td>
-                <td class="align-middle"><strong>Początek</strong></td>
-                <td class="align-middle"><strong>Koniec</strong></td>
-                <td class="align-middle"><strong>Miejsce</strong></td>
-                <td class="align-middle"><strong>Ignoruj<br>konflikty</strong></td>
-                <td></td>
+                <td class="align-middle"><strong>Godziny</strong></td>
+                <td class="align-middle" style="width: 50%"><strong>Miejsce</strong></td>
+                <td class="align-middle"><strong>Interakcja</strong></td>
               </tr>
               </thead>
               <tbody>
               <tr v-for="(term, index) in terms">
-                <td><input class="form-control" type="date" v-model="term.day"></td>
-                <td><input class="form-control" type="time" step="60" v-model="term.start"></td>
-                <td><input class="form-control" type="time" step="60" v-model="term.end"></td>
+                <td><input class="form-control" type="date" v-model="term.day"> </td>
                 <td>
+                    <input class="form-control" type="time" step="60" v-model="term.start">
+                    <input class="form-control" type="time" step="60" v-model="term.end">
+                </td>
+                <td>
+                  <div class="dropdown dropup">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Wybierz miejsce
+                    </button>
+                      
+                      <div class="dropdown-menu scrollable-menu" aria-labelledby="dropdownMenuButton" v-model="term.rooms">
+                      
+                      <div class="dropdown-item" v-bind:class="{ active: term.place }">Miejsce poza instytutem</div>
+                      <input type="text" class="form-control" v-model="term.place" placeholder="Sala HS w Instytucie Matematyki">
+
+                      <button class="dropdown-item" style="outline: none" v-for="room in options.rooms"
+                        v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }" 
+                        v-on:click="add_or_remove_room_from_term(term, room)">  
+                        {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
+                      </button>
+                    </div>
+                  </div>
+                  <!--<div v-if="term.rooms.length === 1 && term.rooms.includes('room_none')">
+                    <br>
+                    <input type="text" class="form-control" v-model="term.place"
+                           placeholder="Sala HS w Instytucie Matematyki">
+                  </div>
                   <select class="custom-select" v-model="term.rooms" title="Wybierz sale" multiple>
                     <option value="room_none">Miejsce poza II</option>
                     <option v-for="room in options.rooms" :value="room.number">
@@ -146,7 +168,7 @@
                     <br>
                     <input type="text" class="form-control" v-model="term.place"
                            placeholder="Sala HS w Instytucie Matematyki">
-                  </div>
+                  </div> -->
                 </td>
                 <td>
                   <button class="btn btn-info" data-toggle="collapse" style="margin-bottom: 5px;"
@@ -155,14 +177,12 @@
                   </button>
 
                   <div :id="'conflicts' + index" class="collapse">
-                    <div v-for="room in term.rooms" v-if="!term.rooms.includes('room_none')">
+                    <div v-for="room in term.rooms">
                       <input type="checkbox" :value="room" v-model="term.ignore_conflicts_rooms">
                       <label>{{ room }}</label>
                     </div>
                   </div>
-                </td>
-                <td>
-                  <button v-on:click="remove_term(index);" class="btn btn-danger">-</button>
+                  <button v-on:click="remove_term(index);" class="btn btn-danger">Usuń</button>
                 </td>
               </tr>
               </tbody>
@@ -196,6 +216,7 @@ export default {
   name: "Reservation",
   data() {
     return {
+      toogleme: false,
       author: "",
       name: "",
       description: "",
@@ -246,7 +267,22 @@ export default {
       // Data for classrooms and user is sent by Django templates, thus we need
       // to retrieve it and save it, so we can use it everywhere in this component.
       this.options.rooms = JSON.parse(document.getElementById("classrooms").innerHTML);
+      for (let room of this.options.rooms){
+        room.active = false;
+      }
       this.user_info = JSON.parse(document.getElementById("user_info").innerHTML);
+    },
+
+    add_or_remove_room_from_term: function(term, room){
+      if (!term.rooms){
+        term.rooms = [room.number];
+        return;
+      }
+      const index = term.rooms.indexOf(room.number);
+      if (index > -1) 
+        term.rooms.splice(index, 1);
+      else
+        term.rooms.push(room.number);
     },
 
     // Functions with fc_ prefix are shorthands for emitting methods in the
@@ -333,8 +369,8 @@ export default {
           // Make sure that if the place of an event is not any of the classrooms
           // in the institute, it selects right option in <select> (as the input
           // for the place is displayed when only 'room_none' is active.
-          if (term.rooms == null || !term.rooms)
-            term.rooms = ['room_none'];
+          //if (term.rooms == null || !term.rooms)
+          //  term.rooms = ['room_none'];
 
           // We need to get rid of seconds to send data properly (expected format
           // is HH:MM, but fetched data is in format HH:MM:SS).
@@ -343,7 +379,6 @@ export default {
 
           term.ignore_conflicts = !(term.ignore_conflicts_rooms == null || !term.ignore_conflicts_rooms);
         }
-
         reservation.terms = event.terms;
       });
 
@@ -389,9 +424,9 @@ export default {
 
     // Send reservation's data in POST request, so it gets saved in database.
     add_to_db: async function () {
-      for (let term of this.terms)
-        if (term.place != "")
-          delete term.rooms;
+      //for (let term of this.terms)
+       // if (term.place != "")
+        //  delete term.rooms;
 
       await axios.post("events/", {
         "title": this.name,
@@ -414,9 +449,9 @@ export default {
 
     // Send edited reservation's data in POST
     edit_in_db: async function () {
-      for (let term of this.terms)
-        if (term.rooms.includes('room_none'))
-          term.rooms = [];
+     // for (let term of this.terms)
+     //   if (term.rooms.includes('room_none'))
+     //     term.rooms = [];
 
       // If user who is not an admin tries to edit an event, its status has to be
       // changed to "pending" - otherwise unprivileged users would not be able to
@@ -463,6 +498,19 @@ export default {
 </script>
 
 <style scoped>
+
+.scrollable-menu {
+    height: auto;
+    max-height: 400px;
+    overflow-x: hidden;
+}
+
+.dropdown:hover .dropdown-menu {
+    white-space: nowrap;
+    display: block;
+    margin-bottom: 0; /* remove the gap so it doesn't close */
+ }
+
 select[multiple] {
   height: 35px !important;
   transition: height 0.5s;
