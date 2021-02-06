@@ -71,9 +71,8 @@ class Student(Model):
 
     @auto_assign
     def __init__(self, id, usos_id, matricula, ects, is_active,
-                 user: dict, program: dict, semestr):
+                 user: dict, program, semestr):
         self.user = User.from_dict(user)
-        self.program = Program.from_dict(program)
 
 
 class Employee(Model):
@@ -179,4 +178,13 @@ class Term(Model):
     @auto_assign
     def __init__(self, id, dayOfWeek, start_time, end_time,
                  group, classrooms, usos_id):
+        pass
+
+
+class CompletedCourse(Model):
+    redirect_key = "completed-courses"
+    is_paginated = True
+
+    @auto_assign
+    def __init__(self, id, student, course, program):
         pass

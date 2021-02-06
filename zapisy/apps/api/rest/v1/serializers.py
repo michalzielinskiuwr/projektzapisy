@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from rest_framework import serializers
 
+from apps.effects.models import CompletedCourses
 from apps.enrollment.courses.models import CourseInstance, Group, Semester
 from apps.enrollment.courses.models.classroom import Classroom
 from apps.enrollment.courses.models.term import Term
@@ -73,18 +74,20 @@ class EmployeeSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'user', 'consultations', 'homepage', 'room')
 
 
-class ProgramSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Program
-        fields = '__all__'
-        extra_kwargs = {
-            'name': {'validators': []},
-        }
+class ProgramRelatedField(serializers.RelatedField):
+    def display_value(self, instance):
+        return instance
+
+    def to_representation(self, value):
+        return value.name
+
+    def to_internal_value(self, data):
+        return Program.objects.get(name=data)
 
 
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer()
-    program = ProgramSerializer(required=False, allow_null=True)
+    program = ProgramRelatedField(queryset=Program.objects.all(), required=False, allow_null=True)
 
     class Meta:
         model = Student
@@ -95,13 +98,11 @@ class StudentSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         students = AuthGroup.objects.get(name='students')
         user_data = validated_data.pop('user')
-        program_data = validated_data.pop('program')
         user = User.objects.create_user(**user_data)
-        program = Program.objects.get(name=program_data['name'])
         students.user_set.add(user)
         students.save()
         student = Student.objects.create(
-            user=user, program=program, **validated_data)
+            user=user, **validated_data)
         return student
 
     @transaction.atomic
@@ -110,11 +111,6 @@ class StudentSerializer(serializers.ModelSerializer):
         validated_data.pop('user', None)
         # Matricula field shouldn't be changed.
         validated_data.pop('matricula', None)
-        program_data = validated_data.pop('program', None)
-        if program_data is not None:
-            instance.program = Program.objects.get(name=program_data['name'])
-        else:
-            instance.program = None
         return super().update(instance, validated_data)
 
 
@@ -217,3 +213,41 @@ class RecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = Record
         fields = ('id', 'group', 'student')
+
+
+class CourseRelatedField(serializers.RelatedField):
+    def display_value(self, instance):
+        return instance
+
+    def to_representation(self, value):
+        return value.usos_kod
+
+    def to_internal_value(self, data):
+        return CourseInstance.objects.get(usos_kod=data)
+
+
+class StudentRelatedField(serializers.RelatedField):
+    def display_value(self, instance):
+        return instance
+
+    def to_representation(self, value):
+        return value.usos_id
+
+    def to_internal_value(self, data):
+        return Student.objects.get(usos_id=data)
+
+
+class CompletedCoursesSerializer(serializers.ModelSerializer):
+    """Serializes a CompletedCourses record.
+
+    StudentRelatedField and CourseRelatedField enable the API to use
+    usos_id and usos_kod to represent student and course fields in CompletedCourses
+    instead of internal django ids while also validating the input
+    """
+    student = StudentRelatedField(queryset=Student.objects.filter(is_active=True))
+    course = CourseRelatedField(queryset=CourseInstance.objects.all())
+    program = ProgramRelatedField(queryset=Program.objects.all())
+
+    class Meta:
+        model = CompletedCourses
+        fields = ('id', 'student', 'course', 'program')

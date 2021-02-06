@@ -7,7 +7,6 @@ from rest_framework.test import APILiveServerTestCase, RequestsClient
 
 # from apps.schedule.tests.factories import TermFactory
 from apps.api.rest.v1.api_wrapper.sz_api import ZapisyApi
-from apps.api.rest.v1.api_wrapper.sz_api import models as api_models
 from apps.enrollment.courses.tests.factories import (ClassroomFactory, CourseInstanceFactory,
                                                      GroupFactory, SemesterFactory, TermFactory)
 from apps.enrollment.records.tests.factories import RecordFactory
@@ -287,8 +286,26 @@ class WrapperTests(APILiveServerTestCase):
         self.assertEqual(student.usos_id, 420)
         self.assertEqual(student.matricula, '666')
         self.assertEqual(student.user.email, "doe@awesome.mail")
-        self.assertEqual(student.program.name, "Informatyka, dzienne I stopnia inżynierskie")
+        self.assertEqual(student.program, "Informatyka, dzienne I stopnia inżynierskie")
         self.assertEqual(student.semestr, 1)
+
+    def test_create_completed_course(self):
+        """Tests creation of CompletedCourses record.
+
+        Adds the record via create_completed_course method and asserts it with new django model.
+        """
+        student = StudentFactory(usos_id=222)
+        course_instance = CourseInstanceFactory(usos_kod="555")
+        program = Program.objects.create(name="Informatyka, dzienne I stopnia inżynierskie")
+
+        completed_course_id = self.wrapper.create_completed_course(
+            student.usos_id, course_instance.usos_kod, program.name
+        )
+        completed_course = self.wrapper.completed_course(completed_course_id)
+
+        self.assertEqual(student.usos_id, completed_course.student)
+        self.assertEqual(course_instance.usos_kod, completed_course.course)
+        self.assertEqual(program.name, completed_course.program)
 
     def test_change_program(self):
         """Test changing and removing student's program."""
@@ -297,12 +314,12 @@ class WrapperTests(APILiveServerTestCase):
         student = StudentFactory(program=p1)
 
         s = self.wrapper.student(id=student.id)
-        self.assertEqual(s.program.id, p1.id)
+        self.assertEqual(s.program, p1.name)
 
-        s.program = api_models.Program(p2.id, p2.name)
+        s.program = p2.name
         self.wrapper.save(s)
         student.refresh_from_db()
-        self.assertEqual(student.program_id, p2.id)
+        self.assertEqual(student.program.name, p2.name)
 
         s = self.wrapper.student(id=student.id)
         s.program = None
