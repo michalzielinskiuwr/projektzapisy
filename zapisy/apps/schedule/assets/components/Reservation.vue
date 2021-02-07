@@ -129,7 +129,7 @@
               </tr>
               </thead>
               <tbody>
-              <tr v-for="(term, index) in terms">
+              <tr v-for="(term, index) in terms" v-bind:key="term.id">
                 <td><input class="form-control" type="date" v-model="term.day"> </td>
                 <td>
                     <input class="form-control" type="time" step="60" v-model="term.start">
@@ -141,15 +141,36 @@
                       Wybierz miejsce
                     </button>
                       
-                      <div class="dropdown-menu scrollable-menu" aria-labelledby="dropdownMenuButton" v-model="term.rooms">
+                    <div class="dropdown-menu scrollable-menu" aria-labelledby="dropdownMenuButton" v-model="term.rooms">
+
+                    <!--<div class="progress bg-light" style="height: 35px;">
+                      <div role="progressbar" class="progress-bar bg-primary" style="width: 0%;">  
+                      </div>
+                      <div role="progressbar" class="progress-bar bg-secondary progress-bar-striped" style="width: 85.7143%;">
+                        Zajęte
+                      </div>
+                      <div role="progressbar" class="progress-bar bg-transparent" style="width: 14.2857%;">
+                      </div>
+                    </div>-->
                       
+                           <!--v-for="progressbar_info in progressbars_info[term][room.number]" v-bind:key="progressbar_info.id"-->
+
+
                       <div class="dropdown-item" v-bind:class="{ active: term.place }">Miejsce poza instytutem</div>
                       <input type="text" class="form-control" v-model="term.place" placeholder="Sala HS w Instytucie Matematyki">
 
-                      <button class="dropdown-item" style="outline: none" v-for="room in options.rooms"
-                        v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }" 
-                        v-on:click="add_or_remove_room_from_term(term, room)">  
-                        {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
+                      <button class="dropdown-item" style="outline: none" v-for="room in options.rooms" v-bind:key="room.number"
+                          v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }" 
+                          v-on:click="add_or_remove_room_from_term(term, room)">
+                        <div class="progress bg-light" style="height: 14px;">
+                          <div role="progressbar" class="progress-bar"
+                           v-for="progressbar_info in progressbars_info[room.number]" v-bind:key="progressbar_info.id"
+                           v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
+                           </div>
+                        </div>
+                        <div >
+                          {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -252,6 +273,8 @@ export default {
         is_employee: false,
         is_admin: false
       },
+      progressbar_color_classes: {empty:"bg-light", occupied:"bg-secondary", reserve:"bg-success", conflict:"bg-danger"},
+      progressbars_info: {}
     }
   },
   mounted() {
@@ -271,6 +294,14 @@ export default {
         room.active = false;
       }
       this.user_info = JSON.parse(document.getElementById("user_info").innerHTML);
+    },
+
+    fill_progressbars_info: function(terms){
+      //console.log(this.options.rooms);
+      for (let room of this.options.rooms){
+        this.$set(this.progressbars_info, room.number, [{width:"30%", class:"bg-light"}, {width:"70%", class:"bg-success"}]);
+      }
+      //console.log(this.progressbars_info);
     },
 
     add_or_remove_room_from_term: function(term, room){
@@ -381,7 +412,7 @@ export default {
         }
         reservation.terms = event.terms;
       });
-
+      this.fill_progressbars_info(this.terms);
       $('#reservation_modal').modal('show');
     },
 
