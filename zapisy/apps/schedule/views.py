@@ -42,6 +42,34 @@ def calendar(request):
                                                           "is_admin": request.user.has_perm('schedule.manage_events')}})
 
 
+def chosen_days_terms(request) -> JsonResponse:
+    """Send all accepted terms from received days."""
+    days = request.GET.get('days', [])
+    days = days.split(',') if isinstance(days, str) else days
+    if "" in days:
+        days.remove("")
+    try:
+        for day in days:
+            day = datetime.strptime(day, '%Y-%m-%d')
+    except ValueError:
+        return HttpResponseBadRequest('Jedna z przesłanych dat jest złego formatu.')
+    terms = Term.objects.filter(day__in=days, room__isnull=False,
+                                event__status=Event.STATUS_ACCEPTED).select_related('room')
+    payload = {}
+    rooms = Classroom.get_in_institute(reservation=True)
+    for day in days:
+        day = str(day)
+        payload[day] = {}
+        for room in rooms:
+            payload[day][room.number] = []
+    for term in terms:
+        payload[str(term.day)][term.room.number].append((term.start, term.end))
+    for day in days:
+        for room in rooms:
+            payload[day][room.number] = sorted(payload[day][room.number])
+    return JsonResponse(payload)
+
+
 def _check_and_prepare_get_data(request, require_dates: bool = True
                                 ) -> Dict[str, datetime or List[str] or str or int or bool]:
     """Parse GET query parameters to python objects.

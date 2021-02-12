@@ -142,31 +142,41 @@
                     </button>
                       
                     <div class="dropdown-menu scrollable-menu" aria-labelledby="dropdownMenuButton" v-model="term.rooms">
-
-                    <!--<div class="progress bg-light" style="height: 35px;">
-                      <div role="progressbar" class="progress-bar bg-primary" style="width: 0%;">  
-                      </div>
-                      <div role="progressbar" class="progress-bar bg-secondary progress-bar-striped" style="width: 85.7143%;">
-                        Zajęte
-                      </div>
-                      <div role="progressbar" class="progress-bar bg-transparent" style="width: 14.2857%;">
-                      </div>
-                    </div>-->
-                      
-                           <!--v-for="progressbar_info in progressbars_info[term][room.number]" v-bind:key="progressbar_info.id"-->
-
-
                       <div class="dropdown-item" v-bind:class="{ active: term.place }">Miejsce poza instytutem</div>
                       <input type="text" class="form-control" v-model="term.place" placeholder="Sala HS w Instytucie Matematyki">
 
                       <button class="dropdown-item" style="outline: none" v-for="room in options.rooms" v-bind:key="room.number"
                           v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }" 
                           v-on:click="add_or_remove_room_from_term(term, room)">
-                        <div class="progress bg-light" style="height: 14px;">
+                        <div class="progress bg-light" style="height: 14px;" v-if="!isFetching_progressbars_terms">
                           <div role="progressbar" class="progress-bar"
-                           v-for="progressbar_info in progressbars_info[room.number]" v-bind:key="progressbar_info.id"
+                           v-for="progressbar_info in progressbars_info[index][room.number][0]" v-bind:key="progressbar_info.id"
                            v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
-                           </div>
+                          </div>
+                        </div>
+                        <div class="progress bg-light" style="z-index: 2; position: relative; top: -14px; width: 100%; visibility: hidden;" v-if="!isFetching_progressbars_terms">
+                          <div role="progressbar" class="progress-bar" style="visibility: visible"
+                           v-for="progressbar_info in progressbars_info[index][room.number][1]" v-bind:key="progressbar_info.id"
+                           v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
+                          </div>
+                        </div>
+                        <div class="progress bg-light" style="z-index: 3; position: relative; top: -28px; width: 100%; visibility: hidden;" v-if="!isFetching_progressbars_terms">
+                          <div role="progressbar" class="progress-bar" style="visibility: visible"
+                           v-for="progressbar_info in progressbars_info[index][room.number][2]" v-bind:key="progressbar_info.id"
+                           v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
+                          </div>
+                        </div>
+                        <div class="row" style="font-family: monospace; position: relative;">
+                          <div class="d-flex flex-row justify-content-between" style="width: 100%;">
+                            <div>08:00</div>
+                            <div>10:00</div> 
+                            <div>12:00</div> 
+                            <div>14:00</div> 
+                            <div>16:00</div> 
+                            <div>18:00</div> 
+                            <div>20:00</div> 
+                            <div>22:00</div>
+                          </div>
                         </div>
                         <div >
                           {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
@@ -174,22 +184,6 @@
                       </button>
                     </div>
                   </div>
-                  <!--<div v-if="term.rooms.length === 1 && term.rooms.includes('room_none')">
-                    <br>
-                    <input type="text" class="form-control" v-model="term.place"
-                           placeholder="Sala HS w Instytucie Matematyki">
-                  </div>
-                  <select class="custom-select" v-model="term.rooms" title="Wybierz sale" multiple>
-                    <option value="room_none">Miejsce poza II</option>
-                    <option v-for="room in options.rooms" :value="room.number">
-                      {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
-                    </option>
-                  </select>
-                  <div v-if="term.rooms.length === 1 && term.rooms.includes('room_none')">
-                    <br>
-                    <input type="text" class="form-control" v-model="term.place"
-                           placeholder="Sala HS w Instytucie Matematyki">
-                  </div> -->
                 </td>
                 <td>
                   <button class="btn btn-info" data-toggle="collapse" style="margin-bottom: 5px;"
@@ -229,6 +223,8 @@
 
 <script>
 import axios from "axios";
+import dayjs from "dayjs";
+import { Term } from '@/enrollment/timetable/assets/models';
 
 axios.defaults.xsrfHeaderName = "X-CSRFTOKEN";
 axios.defaults.xsrfCookieName = "csrftoken";
@@ -273,8 +269,12 @@ export default {
         is_employee: false,
         is_admin: false
       },
-      progressbar_color_classes: {empty:"bg-light", occupied:"bg-secondary", reserve:"bg-success", conflict:"bg-danger"},
-      progressbars_info: {}
+      progressbar_color_classes: {empty:"bg-transparent", occupied:"bg-secondary", reserve:"bg-success", collision:"bg-danger"},
+      progressbars_info: [],
+      progressbars_terms: {},
+      isFetching_progressbars_terms: false,
+      // do not change when user change terms, needed for progressbars (for unclicked reserved term)
+      original_terms: []
     }
   },
   mounted() {
@@ -284,6 +284,29 @@ export default {
   },
   created: function () {
     this.fetch_data_from_html();
+  },
+  watch: {
+    terms: {
+      handler: function(){
+        if (this.terms.length){
+          let dates_changed = false;
+          for (let term of this.terms){
+            if (term.day && !(term.day in this.progressbars_terms)){
+              dates_changed = true;
+              this.isFetching_progressbars_terms = true;
+              this.fill_progressbars_terms().then( _ => {
+                this.fill_progressbars_info();
+                this.isFetching_progressbars_terms = false;
+              });
+              break;
+            }
+          }
+          if (!dates_changed)
+            this.fill_progressbars_info();
+        }
+      }, 
+      deep: true
+    }
   },
   methods: {
     fetch_data_from_html: function () {
@@ -296,12 +319,104 @@ export default {
       this.user_info = JSON.parse(document.getElementById("user_info").innerHTML);
     },
 
-    fill_progressbars_info: function(terms){
-      //console.log(this.options.rooms);
-      for (let room of this.options.rooms){
-        this.$set(this.progressbars_info, room.number, [{width:"30%", class:"bg-light"}, {width:"70%", class:"bg-success"}]);
+    // Get from API all terms that occur in same days as event days.
+    fill_progressbars_terms: async function(){
+      let url = new URL("classrooms/chosen-days-terms/", window.location.origin);
+      let days = "";
+      for (let term of this.terms){
+        days += term.day + ",";
       }
-      //console.log(this.progressbars_info);
+      url.searchParams.set("days", days);
+      let reservation = this;
+      await $.getJSON(url, function (json_terms) {
+        reservation.progressbars_terms = json_terms;
+      });
+    },
+
+    // Calculate progressbars width and class (color) for every term and room.
+    fill_progressbars_info: function(){
+      this.progressbars_info = [];
+      // for every term
+      for (let [index, term] of this.terms.entries()){    
+        this.progressbars_info.push({});
+        // for every room in term
+        for (let room of this.options.rooms){
+          // Make progressbar layers (other terms, chosen term, conflicts).
+          // Each layer will hold list of objects with progressbar width and class (define color)
+          this.progressbars_info[index][room.number] = [[], [], []];
+        }
+      }
+      // we will calculate only hours and minutes, but need full date object
+      let now = dayjs().format('YYYY-MM-DD');
+      for (let [index, term] of this.terms.entries()){
+        // Add first progressbar layer - occupied hours from other terms 
+        for (let room in this.progressbars_terms[term.day]){
+          // if terms with same hours duplicate, omit only one
+          let self_term_hours_omitted = false;
+          let room_progressbar_info = [{start: dayjs(now + "08:00"), end: dayjs(now + "22:00"), color: "empty"}];
+          for (let term_hours of this.progressbars_terms[term.day][room]){      
+            // do not make collision with self
+            if (this.original_terms[index] !== undefined && 
+                this.original_terms[index].rooms.includes(room) && 
+                term_hours[0].slice(0, 5) == this.original_terms[index].start &&
+                term_hours[1].slice(0, 5) == this.original_terms[index].end &&
+                !self_term_hours_omitted){
+              self_term_hours_omitted = true;
+              continue;
+            }
+            room_progressbar_info[room_progressbar_info.length - 1].end = dayjs(now + term_hours[0]);
+            room_progressbar_info.push({start: dayjs(now + term_hours[0]),  end: dayjs(now + term_hours[1]), color: "occupied"});
+            room_progressbar_info.push({start: dayjs(now + term_hours[1]),  end: dayjs(now + "22:00"), color: "empty"});
+          }
+          this.progressbars_info[index][room][0] = room_progressbar_info;
+        }
+        // Add second progressbar layer - reserved hours from chosen start and end
+        for (let room of term.rooms){
+          this.progressbars_info[index][room][1] = [
+            {start: dayjs(now + "08:00"), end: dayjs(now + term.start), color: "empty"},
+            {start: dayjs(now + term.start), end: dayjs(now + term.end), color: "reserve"},
+            {start: dayjs(now + term.end), end: dayjs(now + "22:00"), color: "empty"}
+          ];
+        }
+        // Add third progressbar layer - collisions
+        for (let room of term.rooms){
+          let room_progressbar_collisions = [{start: dayjs(now + "08:00"), end: dayjs(now + "22:00"), color: "empty"}]
+          let curr_term_start = dayjs(now + term.start);
+          let curr_term_end = dayjs(now + term.end);
+
+          for (let first_layer_term_info of this.progressbars_info[index][room][0]){
+            if (first_layer_term_info.color == "occupied" &&
+                first_layer_term_info.start.isBefore(curr_term_end) &&
+                first_layer_term_info.end.isAfter(curr_term_start)){
+                  let collision = {color: "collision"};
+                  if (first_layer_term_info.start.isBefore(curr_term_start))
+                    collision.start = curr_term_start;
+                  else
+                    collision.start = first_layer_term_info.start;
+                  if (first_layer_term_info.end.isAfter(curr_term_end))
+                    collision.end = curr_term_end;
+                  else
+                    collision.end = first_layer_term_info.end;
+                  room_progressbar_collisions[room_progressbar_collisions.length - 1].end = collision.start; 
+                  room_progressbar_collisions.push(collision);
+                  room_progressbar_collisions.push({start: collision.end,  end: dayjs(now + "22:00"), color: "empty"});
+                }
+          }
+          this.progressbars_info[index][room][2] = room_progressbar_collisions;
+        }
+      }
+      // Change progressbar terms hours to width parameter and color string to proper progressbar class
+      for (let progressbar_info of this.progressbars_info){
+        for (let room in progressbar_info){
+          for (let layer of progressbar_info[room]){
+            for (let term_info of layer){
+              // between 8:00 - 22:00 is 14 hours * 60 minutes
+              term_info.width = (term_info.end.diff(term_info.start, "minutes", true) / (14 * 60) * 100).toFixed(2) + "%";
+              term_info.class = this.progressbar_color_classes[term_info.color];
+            }     
+          }
+        }
+      }
     },
 
     add_or_remove_room_from_term: function(term, room){
@@ -309,11 +424,11 @@ export default {
         term.rooms = [room.number];
         return;
       }
-      const index = term.rooms.indexOf(room.number);
-      if (index > -1) 
+      let index = term.rooms.indexOf(room.number);
+      if (index > -1)
         term.rooms.splice(index, 1);
       else
-        term.rooms.push(room.number);
+        term.rooms.push(room.number);     
     },
 
     // Functions with fc_ prefix are shorthands for emitting methods in the
@@ -366,7 +481,6 @@ export default {
           end: end,
           color: "pink"
         });
-
         this.fc_unselect();
       }
     },
@@ -411,8 +525,9 @@ export default {
           term.ignore_conflicts = !(term.ignore_conflicts_rooms == null || !term.ignore_conflicts_rooms);
         }
         reservation.terms = event.terms;
+        // deep copy of terms, needed for progressbars
+        reservation.original_terms =  JSON.parse(JSON.stringify(event.terms));
       });
-      this.fill_progressbars_info(this.terms);
       $('#reservation_modal').modal('show');
     },
 
@@ -430,6 +545,10 @@ export default {
       this.visible = true;
       this.terms = [];
       this.url = "";
+      this.progressbars_info = [],
+      this.progressbars_terms = {},
+      this.isFetching_progressbars_terms = false,
+      this.original_terms = []
 
       $('#reservation_modal').modal('hide');
     },
@@ -451,6 +570,7 @@ export default {
     // Remove a term row from in the add/edit event modal
     remove_term: function (index) {
       this.terms.splice(index, 1);
+      this.original_terms.splice(index, 1);
     },
 
     // Send reservation's data in POST request, so it gets saved in database.
