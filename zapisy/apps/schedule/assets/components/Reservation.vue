@@ -224,6 +224,8 @@
 <script>
 import axios from "axios";
 import dayjs from "dayjs";
+var isSameOrAfter = require('dayjs/plugin/isSameOrAfter');
+dayjs.extend(isSameOrAfter);
 import { Term } from '@/enrollment/timetable/assets/models';
 
 axios.defaults.xsrfHeaderName = "X-CSRFTOKEN";
@@ -364,9 +366,18 @@ export default {
               self_term_hours_omitted = true;
               continue;
             }
-            room_progressbar_info[room_progressbar_info.length - 1].end = dayjs(now + term_hours[0]);
-            room_progressbar_info.push({start: dayjs(now + term_hours[0]),  end: dayjs(now + term_hours[1]), color: "occupied"});
-            room_progressbar_info.push({start: dayjs(now + term_hours[1]),  end: dayjs(now + "22:00"), color: "empty"});
+            // If term hours collide, remove empty progressbar after colliding hours and merge colliding term hours
+            if (room_progressbar_info.length > 1 && 
+                room_progressbar_info[room_progressbar_info.length - 1].start.isSameOrAfter(dayjs(now + term_hours[0]))){
+              room_progressbar_info.pop();
+              let collision = room_progressbar_info[room_progressbar_info.length - 1];
+              collision.start = collision.start.isBefore(dayjs(now + term_hours[0])) ? collision.start : dayjs(now + term_hours[0]);
+              collision.end = collision.end.isAfter(dayjs(now + term_hours[1])) ? collision.end : dayjs(now + term_hours[1]);
+            }else{
+              room_progressbar_info[room_progressbar_info.length - 1].end = dayjs(now + term_hours[0]);
+              room_progressbar_info.push({start: dayjs(now + term_hours[0]),  end: dayjs(now + term_hours[1]), color: "occupied"});
+              room_progressbar_info.push({start: dayjs(now + term_hours[1]),  end: dayjs(now + "22:00"), color: "empty"});
+            } 
           }
           this.progressbars_info[index][room][0] = room_progressbar_info;
         }
