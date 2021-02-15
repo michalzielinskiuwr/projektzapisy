@@ -23,10 +23,7 @@ class EventFactory(DjangoModelFactory):
     class Meta:
         model = Event
 
-    type = factory.Iterator([
-        Event.TYPE_GENERIC, Event.TYPE_CLASS, Event.TYPE_TEST, Event.TYPE_EXAM, Event.TYPE_CLASS,
-        Event.TYPE_OTHER, Event.TYPE_SPECIAL_RESERVATION
-    ])
+    type = Event.TYPE_EXAM
     visible = True
     status = Event.STATUS_ACCEPTED
     author = factory.SubFactory(UserFactory)

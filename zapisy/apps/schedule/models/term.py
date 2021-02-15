@@ -90,7 +90,8 @@ class Term(models.Model):
                     message={'room': ['Ta sala nie jest przeznaczona do rezerwacji']},
                     code='invalid'
                 )
-
+        self.validate_against_event_terms()
+        self.validate_against_course_terms()
         super(Term, self).clean()
 
     class Meta:

@@ -6,7 +6,7 @@ from .models.event import Event
 
 
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'created', 'status', 'type', 'description')
+    list_display = ('title', 'author', 'created', 'status', 'type', 'description', 'semester')
     list_filter = ('type',)
     ordering = ('type', 'title')
 
