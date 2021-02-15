@@ -8,12 +8,10 @@ from django.test import TestCase
 from django.utils.crypto import get_random_string
 
 import apps.enrollment.courses.tests.factories as enrollment_factories
-from apps.common import days_of_week
 from apps.enrollment.courses.models.classroom import Classroom
 from apps.enrollment.courses.models.semester import Semester
 from apps.enrollment.courses.tests.objectmothers import ClassroomObjectMother, SemesterObjectMother
 from apps.enrollment.records.models import Record, RecordStatus
-from apps.schedule import feeds
 from apps.schedule.models.event import Event
 from apps.schedule.models.term import Term as EventTerm
 from apps.users.models import Employee
@@ -45,122 +43,6 @@ class TermTestCase(TestCase):
             day=term2.get_day()
         )
         self.assertRaises(ValidationError, term3.full_clean)
-    """
-    def test_different_semester_reservation(self):
-        semester = \
-            enrollment_factories.SemesterFactory(type=Semester.TYPE_SUMMER)
-        semester.save()
-        semester.full_clean()
-        other_semester = \
-            enrollment_factories.SemesterFactory(type=Semester.TYPE_SUMMER)
-        other_semester.save()
-        other_semester.full_clean()
-
-        room25 = enrollment_factories.ClassroomFactory()
-        room25.save()
-        room25.full_clean()
-
-        reservation_author = factories.UserFactory()
-        reservation_author.save()
-
-        reservation = SpecialReservation(semester=semester,
-                                         title="A reservation",
-                                         classroom=room25,
-                                         dayOfWeek=days_of_week.MONDAY,
-                                         start_time=time(8),
-                                         end_time=time(16))
-        reservation.full_clean()
-        reservation.save(author_id=reservation_author.pk)
-        reservation2 = SpecialReservation(semester=semester,
-                                          title="A reservation",
-                                          classroom=room25,
-                                          dayOfWeek=days_of_week.TUESDAY,
-                                          start_time=time(8),
-                                          end_time=time(16))
-        reservation2.full_clean()
-        reservation2.save(author_id=reservation_author.pk)
-        reservation3 = SpecialReservation(semester=semester,
-                                          title="A reservation",
-                                          classroom=room25,
-                                          dayOfWeek=days_of_week.WEDNESDAY,
-                                          start_time=time(8),
-                                          end_time=time(16))
-        reservation3.full_clean()
-        reservation3.save(author_id=reservation_author.pk)
-        reservation4 = SpecialReservation(semester=semester,
-                                          title="A reservation",
-                                          classroom=room25,
-                                          dayOfWeek=days_of_week.THURSDAY,
-                                          start_time=time(8),
-                                          end_time=time(16))
-        reservation4.full_clean()
-        reservation4.save(author_id=reservation_author.pk)
-        reservation5 = SpecialReservation(semester=semester,
-                                          title="A reservation",
-                                          classroom=room25,
-                                          dayOfWeek=days_of_week.FRIDAY,
-                                          start_time=time(8),
-                                          end_time=time(16))
-        reservation5.full_clean()
-        reservation5.save(author_id=reservation_author.pk)
-        reservation6 = SpecialReservation(semester=semester,
-                                          title="A reservation",
-                                          classroom=room25,
-                                          dayOfWeek=days_of_week.SATURDAY,
-                                          start_time=time(8),
-                                          end_time=time(16))
-        reservation6.full_clean()
-        reservation6.save(author_id=reservation_author.pk)
-        reservation7 = SpecialReservation(semester=semester,
-                                          title="A reservation",
-                                          classroom=room25,
-                                          dayOfWeek=days_of_week.SUNDAY,
-                                          start_time=time(8),
-                                          end_time=time(16))
-        reservation7.full_clean()
-        reservation7.save(author_id=reservation_author.pk)
-
-        # It would fail, was this term in the same semester as the reservations.
-        term = factories.TermFactory(room=room25,
-                                     day=other_semester.lectures_beginning,
-                                     start=time(9), end=time(17))
-        term.full_clean()
-        term.save()
-        self.assertEqual(other_semester.semester_beginning, term.day)
-        self.assertEqual(reservation.classroom, term.room)
-        """
-
-
-class FeedsTestCase(TestCase):
-    def test_item_title(self):
-        event = factories.EventFactory()
-        event2 = factories.EventFactory()
-        latest = feeds.Latest()
-        item_title = [
-            feeds.Latest.item_title(
-                latest, event), feeds.Latest.item_title(
-                latest, event2)]
-        item_author = [
-            feeds.Latest.item_author_name(
-                latest, event), feeds.Latest.item_author_name(
-                latest, event)]
-        item_pub = [
-            feeds.Latest.item_pubdate(
-                latest, event), feeds.Latest.item_pubdate(
-                latest, event)]
-        item_desc = [
-            feeds.Latest.item_description(
-                latest, event), feeds.Latest.item_description(
-                latest, event)]
-        item_auth_mail = [
-            feeds.Latest.item_author_email(
-                latest, event), feeds.Latest.item_author_email(
-                latest, event)]
-        self.assertEqual(len(item_title), 2)
-        self.assertEqual(len(item_author), 2)
-        self.assertEqual(len(item_pub), 2)
-        self.assertEqual(len(item_desc), 2)
-        self.assertEqual(len(item_auth_mail), 2)
 
 
 class EventTestCase(TestCase):

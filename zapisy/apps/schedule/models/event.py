@@ -9,7 +9,8 @@ from django.http import Http404
 from apps.enrollment.courses.models.course_instance import CourseInstance
 from apps.enrollment.courses.models.group import Group
 from apps.enrollment.records.models import Record, RecordStatus
-
+from apps.enrollment.courses.models.semester import Semester
+from apps.notifications.custom_signals import terms_conflict
 
 class Event(models.Model):
     TYPE_EXAM = '0'
@@ -49,6 +50,7 @@ class Event(models.Model):
     group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.CASCADE)
 
     interested = models.ManyToManyField(User, related_name='interested_events')
+    semester = models.ForeignKey(Semester, null=True, blank=True, default=None, verbose_name='semestr', on_delete=models.CASCADE)
 
     author = models.ForeignKey(User, verbose_name='Twórca', on_delete=models.CASCADE)
     created = models.DateTimeField(auto_now_add=True)
