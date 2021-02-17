@@ -1,0 +1,684 @@
+<template>
+  <div>
+    <div class="modal fade" tabindex="-1" role="dialog" id="reservation_modal" ref="modal_ref">
+      <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div v-if="!user_info.is_admin && !(user_info.full_name == author) && edit_or_view" class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Informacje o wydarzeniu</h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label>Autor wydarzenia</label>
+              <input type="text" class="form-control" v-model="author" disabled>
+            </div>
+
+            <div class="form-group">
+              <label>Nazwa wydarzenia</label>
+              <input class="form-control" v-model="name" disabled>
+            </div>
+
+            <div class="form-group">
+              <label>Opis wydarzenia</label>
+              <textarea class="form-control" v-model="description" disabled></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Typ wydarzenia</label>
+              <select v-model="type" class="form-control" disabled>
+                <option v-for="option in options.type" v-bind:value="option.value">
+                  {{ option.text }}
+                </option>
+              </select>
+            </div>
+
+            <table class="table table-sm table-striped">
+              <thead>
+              <tr>
+                <td><strong>Dzień</strong></td>
+                <td><strong>Początek</strong></td>
+                <td><strong>Koniec</strong></td>
+                <td><strong>Miejsce</strong></td>
+              </tr>
+              </thead>
+              <tbody>
+              <tr v-for="(term, index) in terms">
+                <td><p>{{ term.day }}</p></td>
+                <td><p>{{ term.start }}</p></td>
+                <td><p>{{ term.end }}</p></td>
+                <td v-if="term.place == '' || term.place == null">
+                  Sale: <p v-for="room in term.rooms" style="display: inline;">{{ room }} </p>
+                </td>
+                <td v-else>
+                  {{ term.place }}
+                </td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div v-else class="modal-content">
+          <div class="modal-header">
+            <h5 v-if="!edit_or_view" class="modal-title">Utwórz wydarzenie</h5>
+            <h5 v-else-if="edit_or_view && user_info.is_admin || user_info.full_name == author">
+              Edytuj wydarzenie
+            </h5>
+            <button type="button" class="close" data-dismiss="modal">
+              <span>&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group" v-if="edit_or_view">
+              <label>Autor wydarzenia</label>
+              <input type="text" class="form-control" v-model="author" disabled>
+            </div>
+
+            <div class="form-group">
+              <label>Nazwa wydarzenia</label>
+              <input class="form-control" placeholder="Seminarium ANL" v-model="name">
+              <b v-if="!name">Wprowadź nazwę wydarzenia!</b>
+            </div>
+
+            <div class="form-group">
+              <label>Opis wydarzenia</label>
+              <textarea class="form-control" placeholder="Co będzie się działo?" v-model="description"></textarea>
+              <b v-if="!description">Wprowadź opis wydarzenia!</b>
+            </div>
+
+            <div class="form-group">
+              <label>Wydarzenie widoczne dla wszystkich użytkowników</label>
+              <select v-model="visible" class="form-control">
+                <option v-for="option in options.visible" v-bind:value="option.value">
+                  {{ option.text }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group" v-if="user_info.is_admin || user_info.is_employee">
+              <label>Typ wydarzenia</label>
+              <select v-model="type" class="form-control">
+                <option v-for="option in options.type" v-bind:value="option.value">
+                  {{ option.text }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Status wydarzenia</label>
+              <select v-model="status" class="form-control" v-if="user_info.is_admin">
+                <option v-for="option in options.status" v-bind:value="option.value">
+                  {{ option.text }}
+                </option>
+              </select>
+              <select v-model="status" class="form-control" disabled v-else>
+                <option v-for="option in options.status" v-bind:value="option.value">
+                  {{ option.text }}
+                </option>
+              </select>
+            </div>
+
+            <table class="table">
+              <thead>
+              <tr>
+                <td class="align-middle"><strong>Dzień</strong></td>
+                <td class="align-middle"><strong>Godziny</strong></td>
+                <td class="align-middle" style="width: 50%"><strong>Miejsce</strong></td>
+                <td class="align-middle"><strong>Interakcja</strong></td>
+              </tr>
+              </thead>
+              <tbody>
+              <tr v-for="(term, index) in terms" v-bind:key="term.id">
+                <td><input class="form-control" type="date" v-model="term.day"> </td>
+                <td>
+                    <input class="form-control" type="time" step="60" v-model="term.start">
+                    <input class="form-control" type="time" step="60" v-model="term.end">
+                </td>
+                <td>
+                  <div class="dropdown dropup">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      Wybierz miejsce
+                    </button>
+                      
+                    <div class="dropdown-menu scrollable-menu" aria-labelledby="dropdownMenuButton" v-model="term.rooms">
+                      <div class="dropdown-item" v-bind:class="{ active: term.place }">Miejsce poza instytutem</div>
+                      <input type="text" class="form-control" v-model="term.place" placeholder="Sala HS w Instytucie Matematyki">
+
+                      <button class="dropdown-item" style="outline: none" v-for="room in options.rooms" v-bind:key="room.number"
+                          v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }" 
+                          v-on:click="add_or_remove_room_from_term(term, room)">
+                        <div class="progress bg-light" style="height: 14px;" v-if="!isFetching_progressbars_terms">
+                          <div role="progressbar" class="progress-bar"
+                           v-for="progressbar_info in progressbars_info[index][room.number][0]" v-bind:key="progressbar_info.id"
+                           v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
+                          </div>
+                        </div>
+                        <div class="progress bg-light" style="z-index: 2; position: relative; top: -14px; width: 100%; visibility: hidden;" v-if="!isFetching_progressbars_terms">
+                          <div role="progressbar" class="progress-bar" style="visibility: visible"
+                           v-for="progressbar_info in progressbars_info[index][room.number][1]" v-bind:key="progressbar_info.id"
+                           v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
+                          </div>
+                        </div>
+                        <div class="progress bg-light" style="z-index: 3; position: relative; top: -28px; width: 100%; visibility: hidden;" v-if="!isFetching_progressbars_terms">
+                          <div role="progressbar" class="progress-bar" style="visibility: visible"
+                           v-for="progressbar_info in progressbars_info[index][room.number][2]" v-bind:key="progressbar_info.id"
+                           v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
+                          </div>
+                        </div>
+                        <div class="row" style="font-family: monospace; position: relative;">
+                          <div class="d-flex flex-row justify-content-between" style="width: 100%;">
+                            <div>08:00</div>
+                            <div>10:00</div> 
+                            <div>12:00</div> 
+                            <div>14:00</div> 
+                            <div>16:00</div> 
+                            <div>18:00</div> 
+                            <div>20:00</div> 
+                            <div>22:00</div>
+                          </div>
+                        </div>
+                        <div >
+                          {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <button class="btn btn-info" data-toggle="collapse" style="margin-bottom: 5px;"
+                          :data-target="'#conflicts' + index">
+                    Konflikty
+                  </button>
+
+                  <div :id="'conflicts' + index" class="collapse">
+                    <div v-for="room in term.rooms">
+                      <input type="checkbox" :value="room" v-model="term.ignore_conflicts_rooms">
+                      <label>{{ room }}</label>
+                    </div>
+                  </div>
+                  <button v-on:click="remove_term(index);" class="btn btn-danger">Usuń</button>
+                </td>
+              </tr>
+              </tbody>
+            </table>
+            <div>
+              <button class="btn btn-primary" @click="add_term">Dodaj termin</button>
+            </div>
+          </div>
+          <div class="modal-footer" v-if="edit_or_view">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
+            <button type="button" class="btn btn-danger" @click="remove_from_db(url)">Usuń wydarzenie</button>
+            <button type="button" class="btn btn-success" @click="edit_in_db">Edytuj wydarzenie</button>
+          </div>
+          <div class="modal-footer" v-else>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
+            <button type="button" class="btn btn-success" @click="add_to_db">Utwórz wydarzenie</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import axios from "axios";
+import dayjs from "dayjs";
+var isSameOrAfter = require('dayjs/plugin/isSameOrAfter');
+dayjs.extend(isSameOrAfter);
+import { Term } from '@/enrollment/timetable/assets/models';
+
+axios.defaults.xsrfHeaderName = "X-CSRFTOKEN";
+axios.defaults.xsrfCookieName = "csrftoken";
+
+export default {
+  name: "Reservation",
+  data() {
+    return {
+      toogleme: false,
+      author: "",
+      name: "",
+      description: "",
+      visible: true,
+      type: "2",
+      status: "0",
+      terms: [],
+
+      options: {
+        visible: [
+          {value: true, text: 'Tak'},
+          {value: false, text: 'Nie'},
+        ],
+        type: [
+          {value: "0", text: "Egzamin"},
+          {value: "1", text: "Kolokwium"},
+          {value: "2", text: "Wydarzenie"},
+          {value: "5", text: "Rezerwacja cykliczna"}
+        ],
+        status: [
+          {value: "0", text: "Oczekujące"},
+          {value: "1", text: "Zaakceptowane"},
+          {value: "2", text: "Odrzucone"},
+        ],
+        rooms: []
+      },
+
+      edit_or_view: false,
+      url: "",
+      user_info: {
+        full_name: "",
+        is_student: false,
+        is_employee: false,
+        is_admin: false
+      },
+      progressbar_color_classes: {empty:"bg-transparent", occupied:"bg-secondary", reserve:"bg-success", collision:"bg-danger"},
+      progressbars_info: [],
+      progressbars_terms: {},
+      isFetching_progressbars_terms: false,
+      // do not change when user change terms, needed for progressbars (for unclicked reserved term)
+      original_terms: []
+    }
+  },
+  mounted() {
+    // If reservation modal closes by any way, reload all modal's data and remove
+    // temporary event in calendar (used on creating events)
+    $(this.$refs.modal_ref).on("hidden.bs.modal", this.clear_and_hide_modal);
+  },
+  created: function () {
+    this.fetch_data_from_html();
+  },
+  watch: {
+    terms: {
+      handler: function(){
+        if (this.terms.length){
+          let dates_changed = false;
+          for (let term of this.terms){
+            if (term.day && !(term.day in this.progressbars_terms)){
+              dates_changed = true;
+              this.isFetching_progressbars_terms = true;
+              this.fill_progressbars_terms().then( _ => {
+                this.fill_progressbars_info();
+                this.isFetching_progressbars_terms = false;
+              });
+              break;
+            }
+          }
+          if (!dates_changed)
+            this.fill_progressbars_info();
+        }
+      }, 
+      deep: true
+    }
+  },
+  methods: {
+    fetch_data_from_html: function () {
+      // Data for classrooms and user is sent by Django templates, thus we need
+      // to retrieve it and save it, so we can use it everywhere in this component.
+      this.options.rooms = JSON.parse(document.getElementById("classrooms").innerHTML);
+      for (let room of this.options.rooms){
+        room.active = false;
+      }
+      this.user_info = JSON.parse(document.getElementById("user_info").innerHTML);
+    },
+
+    // Get from API all terms that occur in same days as event days.
+    fill_progressbars_terms: async function(){
+      let url = new URL("classrooms/chosen-days-terms/", window.location.origin);
+      let days = "";
+      for (let term of this.terms){
+        days += term.day + ",";
+      }
+      url.searchParams.set("days", days);
+      let reservation = this;
+      await $.getJSON(url, function (json_terms) {
+        reservation.progressbars_terms = json_terms;
+      });
+    },
+
+    // Calculate progressbars width and class (color) for every term and room.
+    fill_progressbars_info: function(){
+      this.progressbars_info = [];
+      // for every term
+      for (let [index, term] of this.terms.entries()){    
+        this.progressbars_info.push({});
+        // for every room in term
+        for (let room of this.options.rooms){
+          // Make progressbar layers (other terms, chosen term, conflicts).
+          // Each layer will hold list of objects with progressbar width and class (define color)
+          this.progressbars_info[index][room.number] = [[], [], []];
+        }
+      }
+      // we will calculate only hours and minutes, but need full date object
+      let now = dayjs().format('YYYY-MM-DD');
+      for (let [index, term] of this.terms.entries()){
+        // Add first progressbar layer - occupied hours from other terms 
+        for (let room in this.progressbars_terms[term.day]){
+          // if terms with same hours duplicate, omit only one
+          let self_term_hours_omitted = false;
+          let room_progressbar_info = [{start: dayjs(now + "08:00"), end: dayjs(now + "22:00"), color: "empty"}];
+          for (let term_hours of this.progressbars_terms[term.day][room]){      
+            // do not make collision with self
+            if (this.original_terms[index] !== undefined && 
+                this.original_terms[index].rooms.includes(room) && 
+                term_hours[0].slice(0, 5) == this.original_terms[index].start &&
+                term_hours[1].slice(0, 5) == this.original_terms[index].end &&
+                !self_term_hours_omitted){
+              self_term_hours_omitted = true;
+              continue;
+            }
+            // If term hours collide, remove empty progressbar after colliding hours and merge colliding term hours
+            if (room_progressbar_info.length > 1 && 
+                room_progressbar_info[room_progressbar_info.length - 1].start.isSameOrAfter(dayjs(now + term_hours[0]))){
+              room_progressbar_info.pop();
+              let collision = room_progressbar_info[room_progressbar_info.length - 1];
+              collision.start = collision.start.isBefore(dayjs(now + term_hours[0])) ? collision.start : dayjs(now + term_hours[0]);
+              collision.end = collision.end.isAfter(dayjs(now + term_hours[1])) ? collision.end : dayjs(now + term_hours[1]);
+            }else{
+              room_progressbar_info[room_progressbar_info.length - 1].end = dayjs(now + term_hours[0]);
+              room_progressbar_info.push({start: dayjs(now + term_hours[0]),  end: dayjs(now + term_hours[1]), color: "occupied"});
+              room_progressbar_info.push({start: dayjs(now + term_hours[1]),  end: dayjs(now + "22:00"), color: "empty"});
+            } 
+          }
+          this.progressbars_info[index][room][0] = room_progressbar_info;
+        }
+        // Add second progressbar layer - reserved hours from chosen start and end
+        for (let room of term.rooms){
+          this.progressbars_info[index][room][1] = [
+            {start: dayjs(now + "08:00"), end: dayjs(now + term.start), color: "empty"},
+            {start: dayjs(now + term.start), end: dayjs(now + term.end), color: "reserve"},
+            {start: dayjs(now + term.end), end: dayjs(now + "22:00"), color: "empty"}
+          ];
+        }
+        // Add third progressbar layer - collisions
+        for (let room of term.rooms){
+          let room_progressbar_collisions = [{start: dayjs(now + "08:00"), end: dayjs(now + "22:00"), color: "empty"}]
+          let curr_term_start = dayjs(now + term.start);
+          let curr_term_end = dayjs(now + term.end);
+
+          for (let first_layer_term_info of this.progressbars_info[index][room][0]){
+            if (first_layer_term_info.color == "occupied" &&
+                first_layer_term_info.start.isBefore(curr_term_end) &&
+                first_layer_term_info.end.isAfter(curr_term_start)){
+                  let collision = {color: "collision"};
+                  if (first_layer_term_info.start.isBefore(curr_term_start))
+                    collision.start = curr_term_start;
+                  else
+                    collision.start = first_layer_term_info.start;
+                  if (first_layer_term_info.end.isAfter(curr_term_end))
+                    collision.end = curr_term_end;
+                  else
+                    collision.end = first_layer_term_info.end;
+                  room_progressbar_collisions[room_progressbar_collisions.length - 1].end = collision.start; 
+                  room_progressbar_collisions.push(collision);
+                  room_progressbar_collisions.push({start: collision.end,  end: dayjs(now + "22:00"), color: "empty"});
+                }
+          }
+          this.progressbars_info[index][room][2] = room_progressbar_collisions;
+        }
+      }
+      // Change progressbar terms hours to width parameter and color string to proper progressbar class
+      for (let progressbar_info of this.progressbars_info){
+        for (let room in progressbar_info){
+          for (let layer of progressbar_info[room]){
+            for (let term_info of layer){
+              // between 8:00 - 22:00 is 14 hours * 60 minutes
+              term_info.width = (term_info.end.diff(term_info.start, "minutes", true) / (14 * 60) * 100).toFixed(2) + "%";
+              term_info.class = this.progressbar_color_classes[term_info.color];
+            }     
+          }
+        }
+      }
+    },
+
+    add_or_remove_room_from_term: function(term, room){
+      if (!term.rooms){
+        term.rooms = [room.number];
+        return;
+      }
+      let index = term.rooms.indexOf(room.number);
+      if (index > -1)
+        term.rooms.splice(index, 1);
+      else
+        term.rooms.push(room.number);     
+    },
+
+    // Functions with fc_ prefix are shorthands for emitting methods in the
+    // Fullcalendar component, as it is the only possibility to call them.
+    fc_add_event: function (event_obj) {
+      this.$emit('addEvent', event_obj);
+    },
+
+    fc_unselect: function () {
+      this.$emit('unselect');
+    },
+
+    fc_hide_event_by_id: function (event_id) {
+      this.$emit('hideEventById', event_id);
+    },
+
+    fc_refetch_events: function () {
+      this.$emit('refetchEvents');
+    },
+
+    // This modal is displayed only when adding event, it supports either adding events
+    // by clicking the "Create event" button and selecting hours in FullCalendar
+    show_modal_add: function (timeRange) {
+      // this.clear_and_hide_modal();
+      console.log("show_modal_add called from Reservation.vue");
+      this.edit_or_view = false; // do not print extra fields (available in edit/view modes only)
+      $('#reservation_modal').modal('show');
+
+      if (timeRange != null) {
+        // timeRange is argument received from FullCalendar by selecting event's hours
+        let start = new Date(timeRange.startStr).toISOString();
+        let end = new Date(timeRange.endStr).toISOString();
+
+        this.add_term();
+        // Get the day in YYYY-MM-DD format and start and end in HH-MM format
+        this.terms[0].day = start.slice(0, 10);
+        this.terms[0].start = start.slice(11, 16);
+        this.terms[0].end = end.slice(11, 16);
+
+        // If user wants to make a reservation in "Month" view, startStr and endStr
+        // are equal to 00:00, so make the term to be since 8 AM to 10 PM.
+        if (this.terms[0].start == "00:00") this.terms[0].start = "08:00";
+        if (this.terms[0].end == "00:00") this.terms[0].end = "22:00";
+
+        // Display temporary event in the calendar which corresponds to selected hours
+        this.fc_add_event({
+          id: "temp",
+          title: "Nowe wydarzenie (wstępny termin)",
+          start: start,
+          end: end,
+          color: "pink"
+        });
+        this.fc_unselect();
+      }
+    },
+
+    // This modal is used both in editing an event and displaying its properties
+    // (for people without permissions), it is opened by clicking an event in calendar.
+    show_modal_edit_or_view: async function (info) {
+      console.log("show_modal_edit_or_view called from Reservation.vue");
+      // When user wants to see properties of classes, return from the function
+      // and user will be redirected to the group's list.
+      if (info.event.url.includes("course"))
+        return;
+
+      this.edit_or_view = true;
+      info.jsEvent.preventDefault();
+
+      // Get data from given URL and save it in fields of reservation app. We
+      // need to save the reference to 'this', otherwise in the body of getJSON
+      // we would not be able to set values of Reservation's fields.
+      let reservation = this;
+      await $.getJSON(info.event.url, function (event) {
+        reservation.author = event.author;
+        reservation.name = event.title;
+        reservation.description = event.description;
+        reservation.type = event.type;
+        reservation.status = event.status;
+        reservation.visible = event.visible;
+        reservation.url = event.url;
+
+        for (let term of event.terms) {
+          // Make sure that if the place of an event is not any of the classrooms
+          // in the institute, it selects right option in <select> (as the input
+          // for the place is displayed when only 'room_none' is active.
+          //if (term.rooms == null || !term.rooms)
+          //  term.rooms = ['room_none'];
+
+          // We need to get rid of seconds to send data properly (expected format
+          // is HH:MM, but fetched data is in format HH:MM:SS).
+          term.start = term.start.length == 5 ? term.start : term.start.slice(0, 5);
+          term.end = term.end.length == 5 ? term.end : term.end.slice(0, 5);
+
+          term.ignore_conflicts = !(term.ignore_conflicts_rooms == null || !term.ignore_conflicts_rooms);
+        }
+        reservation.terms = event.terms;
+        // deep copy of terms, needed for progressbars
+        reservation.original_terms =  JSON.parse(JSON.stringify(event.terms));
+      });
+      $('#reservation_modal').modal('show');
+    },
+
+    // Empty all data fields used in the form and close the modal, used basically
+    // to prepare the modal for next uses.
+    clear_and_hide_modal: async function () {
+      this.fc_hide_event_by_id('temp');
+      await this.fc_refetch_events();
+
+      this.author = "";
+      this.name = "";
+      this.description = "";
+      this.type = "2";
+      this.status = "0";
+      this.visible = true;
+      this.terms = [];
+      this.url = "";
+      this.progressbars_info = [],
+      this.progressbars_terms = {},
+      this.isFetching_progressbars_terms = false,
+      this.original_terms = []
+
+      $('#reservation_modal').modal('hide');
+    },
+
+    // Add a term row in the add/edit event modal
+    add_term: function () {
+      let elem = document.createElement('tr');
+      this.terms.push({
+        day: "",
+        start: "",
+        end: "",
+        place: "",
+        rooms: [],
+        ignore_conflicts: false,
+        ignore_conflicts_rooms: [],
+      });
+    },
+
+    // Remove a term row from in the add/edit event modal
+    remove_term: function (index) {
+      this.terms.splice(index, 1);
+      this.original_terms.splice(index, 1);
+    },
+
+    // Send reservation's data in POST request, so it gets saved in database.
+    add_to_db: async function () {
+      //for (let term of this.terms)
+       // if (term.place != "")
+        //  delete term.rooms;
+
+      await axios.post("events/", {
+        "title": this.name,
+        "description": this.description,
+        "visible": this.visible,
+        "type": this.type,
+        "terms": this.terms
+      })
+          .then(function (response) {
+            console.log(response);
+            alert("Wydarzenie utworzono pomyślnie");
+          })
+          .catch(function (error) {
+            console.log("Creating event failed", error);
+            alert("Nie udało się utworzyć wydarzenia");
+          });
+
+      this.clear_and_hide_modal();
+    },
+
+    // Send edited reservation's data in POST
+    edit_in_db: async function () {
+     // for (let term of this.terms)
+     //   if (term.rooms.includes('room_none'))
+     //     term.rooms = [];
+
+      // If user who is not an admin tries to edit an event, its status has to be
+      // changed to "pending" - otherwise unprivileged users would not be able to
+      // edit events created by them.
+      await axios.post(this.url, {
+        "title": this.name,
+        "description": this.description,
+        "visible": this.visible,
+        "status": this.user_info.is_admin ? this.status : "0",
+        "type": this.type,
+        "terms": this.terms
+      })
+          .then(function (response) {
+            console.log(response);
+            alert("Edycja wydarzenia wykonana");
+          })
+          .catch(function (error) {
+            console.log("Creating event failed", error);
+            alert("Edycja wydarzenia zakończona niepowodzeniem");
+          });
+
+      this.clear_and_hide_modal();
+    },
+
+    // Remove event with given URL from database
+    remove_from_db: async function (url) {
+      if (!url)
+        return;
+
+      await axios.post('delete-event/' + parseInt(url.match(/\d+/)) + '/')
+          .then(function (response) {
+            console.log(response);
+            alert("Wydarzenie usunięto pomyślnie");
+          })
+          .catch(function (error) {
+            console.log("Deleting event failed", error);
+            alert("Nie udało się usunąć wydarzenia");
+          });
+
+      this.clear_and_hide_modal();
+    },
+  }
+}
+</script>
+
+<style scoped>
+
+.scrollable-menu {
+    height: auto;
+    max-height: 400px;
+    overflow-x: hidden;
+}
+
+.dropdown:hover .dropdown-menu {
+    white-space: nowrap;
+    display: block;
+    margin-bottom: 0; /* remove the gap so it doesn't close */
+ }
+
+select[multiple] {
+  height: 35px !important;
+  transition: height 0.5s;
+}
+
+select[multiple]:focus {
+  height: 120px !important;
+}
+</style>
