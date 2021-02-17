@@ -123,9 +123,11 @@
               <thead>
               <tr>
                 <td class="align-middle"><strong>Dzień</strong></td>
-                <td class="align-middle"><strong>Godziny</strong></td>
-                <td class="align-middle" style="width: 50%"><strong>Miejsce</strong></td>
-                <td class="align-middle"><strong>Interakcja</strong></td>
+                <td class="align-middle" style="width: 10%"><strong>Początek</strong></td>
+                <td class="align-middle" style="width: 10%"><strong>Koniec</strong></td>
+                <td class="align-middle" style="width: 30%"><strong>Miejsce</strong></td>
+                <td class="align-middle" style="width: 35%"><strong>Interakcja</strong></td>
+                <td></td>
               </tr>
               </thead>
               <tbody>
@@ -133,52 +135,54 @@
                 <td><input class="form-control" type="date" v-model="term.day"> </td>
                 <td>
                     <input class="form-control" type="time" step="60" v-model="term.start">
+                </td>
+                <td>
                     <input class="form-control" type="time" step="60" v-model="term.end">
                 </td>
                 <td>
                   <div class="dropdown dropup">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                      Wybierz miejsce
+                      Wybierz
                     </button>
-                      
+
                     <div class="dropdown-menu scrollable-menu" aria-labelledby="dropdownMenuButton" v-model="term.rooms">
                       <div class="dropdown-item" v-bind:class="{ active: term.place }">Miejsce poza instytutem</div>
                       <input type="text" class="form-control" v-model="term.place" placeholder="Sala HS w Instytucie Matematyki">
 
-                      <button class="dropdown-item" style="outline: none" v-for="room in options.rooms" v-bind:key="room.number"
-                          v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }" 
+                      <button class="dropdown-item term" style="outline: none; border: 1px solid black; max-height: 60px !important;" v-for="room in options.rooms" v-bind:key="room.number"
+                          v-bind:class="{ active: term.rooms && term.rooms.includes(room.number) }"
                           v-on:click="add_or_remove_room_from_term(term, room)">
-                        <div class="progress bg-light" style="height: 14px;" v-if="!isFetching_progressbars_terms">
+                        <div class="progress bg-light term-bar" style="height: 14px;" v-if="!isFetching_progressbars_terms">
                           <div role="progressbar" class="progress-bar"
                            v-for="progressbar_info in progressbars_info[index][room.number][0]" v-bind:key="progressbar_info.id"
                            v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
                           </div>
                         </div>
-                        <div class="progress bg-light" style="z-index: 2; position: relative; top: -14px; width: 100%; visibility: hidden;" v-if="!isFetching_progressbars_terms">
+                        <div class="progress bg-light term-free" style="height: 14px;" v-if="!isFetching_progressbars_terms">
                           <div role="progressbar" class="progress-bar" style="visibility: visible"
                            v-for="progressbar_info in progressbars_info[index][room.number][1]" v-bind:key="progressbar_info.id"
                            v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
                           </div>
                         </div>
-                        <div class="progress bg-light" style="z-index: 3; position: relative; top: -28px; width: 100%; visibility: hidden;" v-if="!isFetching_progressbars_terms">
+                        <div class="progress bg-light term-occupied" style="height: 14px;"v-if="!isFetching_progressbars_terms">
                           <div role="progressbar" class="progress-bar" style="visibility: visible"
                            v-for="progressbar_info in progressbars_info[index][room.number][2]" v-bind:key="progressbar_info.id"
                            v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
                           </div>
                         </div>
-                        <div class="row" style="font-family: monospace; position: relative;">
+                        <div class="row" style="font-family: monospace;">
                           <div class="d-flex flex-row justify-content-between" style="width: 100%;">
                             <div>08:00</div>
-                            <div>10:00</div> 
-                            <div>12:00</div> 
-                            <div>14:00</div> 
-                            <div>16:00</div> 
-                            <div>18:00</div> 
-                            <div>20:00</div> 
+                            <div>10:00</div>
+                            <div>12:00</div>
+                            <div>14:00</div>
+                            <div>16:00</div>
+                            <div>18:00</div>
+                            <div>20:00</div>
                             <div>22:00</div>
                           </div>
                         </div>
-                        <div >
+                        <div>
                           {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
                         </div>
                       </button>
@@ -197,6 +201,8 @@
                       <label>{{ room }}</label>
                     </div>
                   </div>
+                </td>
+                <td>
                   <button v-on:click="remove_term(index);" class="btn btn-danger">Usuń</button>
                 </td>
               </tr>
@@ -224,9 +230,12 @@
 <script>
 import axios from "axios";
 import dayjs from "dayjs";
-var isSameOrAfter = require('dayjs/plugin/isSameOrAfter');
+const utc = require('dayjs/plugin/utc')
+const isSameOrAfter = require('dayjs/plugin/isSameOrAfter');
+const customParseFormat = require('dayjs/plugin/customParseFormat');
+dayjs.extend(utc);
 dayjs.extend(isSameOrAfter);
-import { Term } from '@/enrollment/timetable/assets/models';
+dayjs.extend(customParseFormat);
 
 axios.defaults.xsrfHeaderName = "X-CSRFTOKEN";
 axios.defaults.xsrfCookieName = "csrftoken";
@@ -235,7 +244,6 @@ export default {
   name: "Reservation",
   data() {
     return {
-      toogleme: false,
       author: "",
       name: "",
       description: "",
@@ -271,7 +279,12 @@ export default {
         is_employee: false,
         is_admin: false
       },
-      progressbar_color_classes: {empty:"bg-transparent", occupied:"bg-secondary", reserve:"bg-success", collision:"bg-danger"},
+      progressbar_color_classes: {
+        empty:"bg-transparent",
+        occupied:"bg-secondary",
+        reserve:"bg-success",
+        collision:"bg-danger"
+      },
       progressbars_info: [],
       progressbars_terms: {},
       isFetching_progressbars_terms: false,
@@ -306,7 +319,7 @@ export default {
           if (!dates_changed)
             this.fill_progressbars_info();
         }
-      }, 
+      },
       deep: true
     }
   },
@@ -315,9 +328,9 @@ export default {
       // Data for classrooms and user is sent by Django templates, thus we need
       // to retrieve it and save it, so we can use it everywhere in this component.
       this.options.rooms = JSON.parse(document.getElementById("classrooms").innerHTML);
-      for (let room of this.options.rooms){
+      for (let room of this.options.rooms)
         room.active = false;
-      }
+
       this.user_info = JSON.parse(document.getElementById("user_info").innerHTML);
     },
 
@@ -329,17 +342,17 @@ export default {
         days += term.day + ",";
       }
       url.searchParams.set("days", days);
-      let reservation = this;
-      await $.getJSON(url, function (json_terms) {
-        reservation.progressbars_terms = json_terms;
+
+      await axios.get(url).then((r) => {
+        this.progressbars_terms = r.data;
       });
     },
 
-    // Calculate progressbars width and class (color) for every term and room.
+    // Calculate progress bars width and class (color) for every term and room.
     fill_progressbars_info: function(){
       this.progressbars_info = [];
       // for every term
-      for (let [index, term] of this.terms.entries()){    
+      for (let [index, term] of this.terms.entries()){
         this.progressbars_info.push({});
         // for every room in term
         for (let room of this.options.rooms){
@@ -351,15 +364,15 @@ export default {
       // we will calculate only hours and minutes, but need full date object
       let now = dayjs().format('YYYY-MM-DD');
       for (let [index, term] of this.terms.entries()){
-        // Add first progressbar layer - occupied hours from other terms 
+        // Add first progressbar layer - occupied hours from other terms
         for (let room in this.progressbars_terms[term.day]){
           // if terms with same hours duplicate, omit only one
           let self_term_hours_omitted = false;
           let room_progressbar_info = [{start: dayjs(now + "08:00"), end: dayjs(now + "22:00"), color: "empty"}];
-          for (let term_hours of this.progressbars_terms[term.day][room]){      
+          for (let term_hours of this.progressbars_terms[term.day][room]){
             // do not make collision with self
-            if (this.original_terms[index] !== undefined && 
-                this.original_terms[index].rooms.includes(room) && 
+            if (this.original_terms[index] !== undefined &&
+                this.original_terms[index].rooms.includes(room) &&
                 term_hours[0].slice(0, 5) == this.original_terms[index].start &&
                 term_hours[1].slice(0, 5) == this.original_terms[index].end &&
                 !self_term_hours_omitted){
@@ -367,7 +380,7 @@ export default {
               continue;
             }
             // If term hours collide, remove empty progressbar after colliding hours and merge colliding term hours
-            if (room_progressbar_info.length > 1 && 
+            if (room_progressbar_info.length > 1 &&
                 room_progressbar_info[room_progressbar_info.length - 1].start.isSameOrAfter(dayjs(now + term_hours[0]))){
               room_progressbar_info.pop();
               let collision = room_progressbar_info[room_progressbar_info.length - 1];
@@ -377,7 +390,7 @@ export default {
               room_progressbar_info[room_progressbar_info.length - 1].end = dayjs(now + term_hours[0]);
               room_progressbar_info.push({start: dayjs(now + term_hours[0]),  end: dayjs(now + term_hours[1]), color: "occupied"});
               room_progressbar_info.push({start: dayjs(now + term_hours[1]),  end: dayjs(now + "22:00"), color: "empty"});
-            } 
+            }
           }
           this.progressbars_info[index][room][0] = room_progressbar_info;
         }
@@ -408,9 +421,12 @@ export default {
                     collision.end = curr_term_end;
                   else
                     collision.end = first_layer_term_info.end;
-                  room_progressbar_collisions[room_progressbar_collisions.length - 1].end = collision.start; 
+                  room_progressbar_collisions[room_progressbar_collisions.length - 1].end = collision.start;
                   room_progressbar_collisions.push(collision);
-                  room_progressbar_collisions.push({start: collision.end,  end: dayjs(now + "22:00"), color: "empty"});
+                  room_progressbar_collisions.push({
+                    start: collision.end,
+                    end: dayjs(now + "22:00"),
+                    color: "empty"});
                 }
           }
           this.progressbars_info[index][room][2] = room_progressbar_collisions;
@@ -422,9 +438,11 @@ export default {
           for (let layer of progressbar_info[room]){
             for (let term_info of layer){
               // between 8:00 - 22:00 is 14 hours * 60 minutes
-              term_info.width = (term_info.end.diff(term_info.start, "minutes", true) / (14 * 60) * 100).toFixed(2) + "%";
+              term_info.width = (term_info.end.diff(
+                  term_info.start, "minutes", true) /
+                  (14 * 60) * 100).toFixed(2) + "%";
               term_info.class = this.progressbar_color_classes[term_info.color];
-            }     
+            }
           }
         }
       }
@@ -439,7 +457,7 @@ export default {
       if (index > -1)
         term.rooms.splice(index, 1);
       else
-        term.rooms.push(room.number);     
+        term.rooms.push(room.number);
     },
 
     // Functions with fc_ prefix are shorthands for emitting methods in the
@@ -463,8 +481,6 @@ export default {
     // This modal is displayed only when adding event, it supports either adding events
     // by clicking the "Create event" button and selecting hours in FullCalendar
     show_modal_add: function (timeRange) {
-      // this.clear_and_hide_modal();
-      console.log("show_modal_add called from Reservation.vue");
       this.edit_or_view = false; // do not print extra fields (available in edit/view modes only)
       $('#reservation_modal').modal('show');
 
@@ -475,9 +491,9 @@ export default {
 
         this.add_term();
         // Get the day in YYYY-MM-DD format and start and end in HH-MM format
-        this.terms[0].day = start.slice(0, 10);
-        this.terms[0].start = start.slice(11, 16);
-        this.terms[0].end = end.slice(11, 16);
+        this.terms[0].day = dayjs(start).format("YYYY-MM-DD");
+        this.terms[0].start = dayjs(start).utc().format("HH:mm");
+        this.terms[0].end = dayjs(end).utc().format("HH:mm");
 
         // If user wants to make a reservation in "Month" view, startStr and endStr
         // are equal to 00:00, so make the term to be since 8 AM to 10 PM.
@@ -499,7 +515,6 @@ export default {
     // This modal is used both in editing an event and displaying its properties
     // (for people without permissions), it is opened by clicking an event in calendar.
     show_modal_edit_or_view: async function (info) {
-      console.log("show_modal_edit_or_view called from Reservation.vue");
       // When user wants to see properties of classes, return from the function
       // and user will be redirected to the group's list.
       if (info.event.url.includes("course"))
@@ -508,37 +523,29 @@ export default {
       this.edit_or_view = true;
       info.jsEvent.preventDefault();
 
-      // Get data from given URL and save it in fields of reservation app. We
-      // need to save the reference to 'this', otherwise in the body of getJSON
-      // we would not be able to set values of Reservation's fields.
-      let reservation = this;
-      await $.getJSON(info.event.url, function (event) {
-        reservation.author = event.author;
-        reservation.name = event.title;
-        reservation.description = event.description;
-        reservation.type = event.type;
-        reservation.status = event.status;
-        reservation.visible = event.visible;
-        reservation.url = event.url;
+      // Get data from given URL and save it in fields of reservation app.
+      await axios.get(info.event.url).then((event) => {
+        this.author = event.data.author;
+        this.name = event.data.title;
+        this.description = event.data.description;
+        this.type = event.data.type;
+        this.status = event.data.status;
+        this.visible = event.data.visible;
+        this.url = event.data.url;
 
-        for (let term of event.terms) {
-          // Make sure that if the place of an event is not any of the classrooms
-          // in the institute, it selects right option in <select> (as the input
-          // for the place is displayed when only 'room_none' is active.
-          //if (term.rooms == null || !term.rooms)
-          //  term.rooms = ['room_none'];
-
+        for (let term of event.data.terms) {
           // We need to get rid of seconds to send data properly (expected format
           // is HH:MM, but fetched data is in format HH:MM:SS).
-          term.start = term.start.length == 5 ? term.start : term.start.slice(0, 5);
-          term.end = term.end.length == 5 ? term.end : term.end.slice(0, 5);
+          term.start = dayjs(term.start, "HH:mm").format("HH:mm")
+          term.end = dayjs(term.end, "HH:mm").format("HH:mm")
 
           term.ignore_conflicts = !(term.ignore_conflicts_rooms == null || !term.ignore_conflicts_rooms);
         }
-        reservation.terms = event.terms;
-        // deep copy of terms, needed for progressbars
-        reservation.original_terms =  JSON.parse(JSON.stringify(event.terms));
+        this.terms = event.data.terms;
+        // deep copy of terms, needed for progress bars
+        this.original_terms = JSON.parse(JSON.stringify(event.data.terms));
       });
+
       $('#reservation_modal').modal('show');
     },
 
@@ -586,10 +593,6 @@ export default {
 
     // Send reservation's data in POST request, so it gets saved in database.
     add_to_db: async function () {
-      //for (let term of this.terms)
-       // if (term.place != "")
-        //  delete term.rooms;
-
       await axios.post("events/", {
         "title": this.name,
         "description": this.description,
@@ -598,11 +601,9 @@ export default {
         "terms": this.terms
       })
           .then(function (response) {
-            console.log(response);
             alert("Wydarzenie utworzono pomyślnie");
           })
           .catch(function (error) {
-            console.log("Creating event failed", error);
             alert("Nie udało się utworzyć wydarzenia");
           });
 
@@ -611,10 +612,6 @@ export default {
 
     // Send edited reservation's data in POST
     edit_in_db: async function () {
-     // for (let term of this.terms)
-     //   if (term.rooms.includes('room_none'))
-     //     term.rooms = [];
-
       // If user who is not an admin tries to edit an event, its status has to be
       // changed to "pending" - otherwise unprivileged users would not be able to
       // edit events created by them.
@@ -627,11 +624,9 @@ export default {
         "terms": this.terms
       })
           .then(function (response) {
-            console.log(response);
-            alert("Edycja wydarzenia wykonana");
+            alert("Edycja wydarzenia zakończona pomyślnie");
           })
           .catch(function (error) {
-            console.log("Creating event failed", error);
             alert("Edycja wydarzenia zakończona niepowodzeniem");
           });
 
@@ -645,11 +640,9 @@ export default {
 
       await axios.post('delete-event/' + parseInt(url.match(/\d+/)) + '/')
           .then(function (response) {
-            console.log(response);
             alert("Wydarzenie usunięto pomyślnie");
           })
           .catch(function (error) {
-            console.log("Deleting event failed", error);
             alert("Nie udało się usunąć wydarzenia");
           });
 
@@ -660,6 +653,9 @@ export default {
 </script>
 
 <style scoped>
+.dropdown-item.term.active {
+  background: #2aabd2;
+}
 
 .scrollable-menu {
     height: auto;
@@ -672,6 +668,28 @@ export default {
     display: block;
     margin-bottom: 0; /* remove the gap so it doesn't close */
  }
+
+.term {
+  height: 100px;
+}
+
+.term-bar {
+  z-index: 1;
+}
+
+.term-free {
+  z-index: 2;
+  width: 100%;
+  margin-top: -14px;
+  visibility: hidden;
+}
+
+.term-occupied {
+  z-index: 3;
+  width: 100%;
+  margin-top: -14px;
+  visibility: hidden;
+}
 
 select[multiple] {
   height: 35px !important;

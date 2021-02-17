@@ -70,7 +70,6 @@ export default {
           {value: "1", text: "Kolokwium"},
           {value: "2", text: "Wydarzenie"},
           {value: "3", text: "Zajęcia"},
-          // value "4" is no longer supported, as type 'others' is deprecated
           {value: "5", text: "Rezerwacja cykliczna"}
         ],
         status: [
@@ -136,9 +135,8 @@ export default {
     }
   },
   watch: {
-    // rooms: function () {
-    //   this.$emit('refetchEvents');
-    // }
+    // If any change occurs in filters, refetch all events so everything what
+    // is displayed matches filters.
     rooms: function () { this.emit_refetch_events(); },
     place: function () { this.emit_refetch_events(); },
     types: function () { this.emit_refetch_events(); },
