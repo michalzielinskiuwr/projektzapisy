@@ -20,6 +20,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RemoveField(
+            model_name='event',
+            name='reservation',
+        ),
         migrations.DeleteModel(
             name='SpecialReservation',
         ),

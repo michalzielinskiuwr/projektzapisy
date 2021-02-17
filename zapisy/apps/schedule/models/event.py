@@ -9,7 +9,8 @@ from django.http import Http404
 from apps.enrollment.courses.models.course_instance import CourseInstance
 from apps.enrollment.courses.models.group import Group
 from apps.enrollment.records.models import Record, RecordStatus
-
+from apps.enrollment.courses.models.semester import Semester
+from apps.notifications.custom_signals import terms_conflict
 
 class Event(models.Model):
     TYPE_EXAM = '0'
@@ -49,6 +50,7 @@ class Event(models.Model):
     group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.CASCADE)
 
     interested = models.ManyToManyField(User, related_name='interested_events')
+    semester = models.ForeignKey(Semester, null=True, blank=True, default=None, verbose_name='semestr', on_delete=models.CASCADE)
 
     author = models.ForeignKey(User, verbose_name='Twórca', on_delete=models.CASCADE)
     created = models.DateTimeField(auto_now_add=True)
@@ -78,13 +80,13 @@ class Event(models.Model):
             if not any(self.type == t for t, _ in Event.TYPES_FOR_STUDENT):
                 raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu', code='permission')
             if self.status != Event.STATUS_PENDING:
-                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia', code='permission')
+                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia 1', code='permission')
         # Employee can create accepted exam and test events
         if self.author.employee:
             if not any(self.type == t for t, _ in Event.TYPES_FOR_TEACHER):
                 raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu', code='permission')
             if self.type == Event.TYPE_GENERIC and self.status != Event.STATUS_PENDING:
-                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia', code='permission')
+                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia 2', code='permission')
 
     def clean(self, *args, **kwargs):
         """Overload clean method.
@@ -121,7 +123,7 @@ class Event(models.Model):
                 if self.status != Event.STATUS_PENDING:
                     raise ValidationError(
                         message={
-                            'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia']},
+                            'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia 3']},
                         code='permission')
 
         else:
