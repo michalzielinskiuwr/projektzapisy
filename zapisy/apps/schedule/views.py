@@ -10,7 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest, HttpRequest
 from django.shortcuts import render
 from django.core.validators import ValidationError
 from django.urls import reverse
@@ -184,7 +184,7 @@ def terms(request) -> JsonResponse:
     return JsonResponse(payload, safe=False)
 
 
-def _get_event_author_name_and_url(author: Event.author, user: 'request.user') -> Tuple[str or None, str or None]:
+def _get_event_author_name_and_url(author: Event.author, user: 'HttpRequest.user') -> Tuple[str or None, str or None]:
     """Returns tuple with event author full name and url to author in users app.
 
     Checks if event author is student or employee. If event author is student
@@ -220,7 +220,6 @@ def _get_validated_terms(payload: Dict[str, str or List[Dict]], event: Event = N
           incorrect value like wrong date format. Also when created Term
           validation failed like nonexistent room.
     """
-
     payload_terms = payload.get('terms', [])
     if not payload_terms:
         raise ValidationError("Missing terms key in payload.")
@@ -377,7 +376,7 @@ def _group_terms_same_date_and_time(terms: List[Term]) -> List[Dict]:
     return grouped_terms
 
 
-def _get_event_info_to_send(event: Event, user: 'request.user') -> Dict[str, str or List[Dict]]:
+def _get_event_info_to_send(event: Event, user: 'HttpRequest.user') -> Dict[str, str or List[Dict]]:
     """Returns Dict with all needed info from Event for frontend.
 
     Example usage is when client clicked single event in fullcalendar.
@@ -636,7 +635,8 @@ def display_report(request, form, report_type: 'Literal["table", "doors"]'):  # 
         semester_start_day = semester.semester_beginning
         semester_end_day = semester.semester_ending
         terms = []
-        # Special reservations have same room, start and end every week. Do not duplicate those terms
+        # Special reservations have same room, start and end every week.
+        # Do not duplicate those terms
         for event in special_reservation_events:
             same_room_hour_terms = set()
             temp_terms = event.term_set.all()
