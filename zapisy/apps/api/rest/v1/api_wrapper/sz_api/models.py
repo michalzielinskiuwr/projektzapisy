@@ -90,8 +90,8 @@ class CourseInstance(Model):
     is_paginated = True
 
     @auto_assign
-    def __init__(self, id, name, short_name, points, has_exam,
-                 description, semester, course_type, usos_kod):
+    def __init__(self, id, name, short_name, points, has_exam, description,
+                 language, semester, course_type, usos_kod):
         pass
 
 
@@ -100,7 +100,7 @@ class Classroom(Model):
     is_paginated = False
 
     @auto_assign
-    def __init__(self, id, type, description, number, order, building,
+    def __init__(self, id, type, description, number, building,
                  capacity, floor, can_reserve, slug, usos_id):
         pass
 

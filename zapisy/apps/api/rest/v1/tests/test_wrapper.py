@@ -164,6 +164,7 @@ class WrapperTests(APILiveServerTestCase):
         self.assertEqual(res_course.points, course.points)
         self.assertEqual(res_course.has_exam, course.has_exam)
         self.assertEqual(res_course.description, course.description)
+        self.assertEqual(res_course.language, course.language)
         self.assertEqual(res_course.semester, course.semester.id)
         self.assertEqual(res_course.course_type, course.course_type.short_name)
         self.assertEqual(res_course.usos_kod, course.usos_kod)
@@ -185,7 +186,7 @@ class WrapperTests(APILiveServerTestCase):
         [res_classroom] = list(self.wrapper.classrooms())
 
         self.assert_declared_fields(
-            ('id', 'type', 'description', 'number', 'order', 'building',
+            ('id', 'type', 'description', 'number', 'building',
              'capacity', 'floor', 'can_reserve', 'slug', 'usos_id'),
             res_classroom,
             classroom
