@@ -2,10 +2,10 @@
   <div style="margin-bottom: 10px;" id="filter" class="card bg-light">
     <div class="card-body">
       <h5 class="card-title">Filtry wydarzeń</h5>
-      <div class="row" v-if="!collapsed">
+      <div class="row">
         <div class="col-md-6">
           <label>Wybierz sale:</label>
-          <select class="custom-select" v-model="rooms" title="Wybierz sale" multiple>
+          <select class="custom-select" size="6" v-model="rooms" title="Wybierz sale" multiple>
             <option value="all">Wszystkie</option>
             <option v-for="room in options.rooms" :value="room.number">
               {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
@@ -13,38 +13,31 @@
           </select>
         </div>
 
-        <div class="col-md-3">
+        <div class="col-md-6">
           <div class="form-group">
             <label>Tytuł lub autor wydarzenia:</label>
             <input class="form-control" placeholder="Seminarium lub Jan Nowak" v-model="title_or_author">
           </div>
-          <div class="form-group">
-            <label>Miejsce wydarzenia:</label>
-            <input class="form-control" placeholder="Sala HS w Instytucie Matematyki" v-model="place">
-          </div>
-        </div>
 
-        <div class="col-md-3">
           <label>Typ wydarzenia:</label> <br>
-          <div class="form-check" v-for="type in options.type">
-            <input v-model="types" class="form-check-input" type="checkbox" :value="type.value">
-            <label class="form-check-label">{{ type.text }}</label>
+          <div class="form-check form-check-inline" v-for="(type, index) in options.type">
+            <input v-model="types" class="form-check-input" type="checkbox"
+                   :value="type.value" :id="'type' + index">
+            <label class="form-check-label filter-box"
+              :style="{'background-color': type.color}"
+              :for="'type' + index">{{ type.text }}</label>
           </div>
         </div>
       </div>
-
-      <div class="row" v-if="!collapsed && user_info.is_admin">
-        <div class="col-md-12">
-          <label>Status wydarzenia:</label><br>
+      <div class="row" v-if="user_info.is_admin">
+        <div class="col-md-12" style="margin-top: 10px">
+          <label>Status wydarzenia:</label>
           <div class="form-check form-check-inline" v-for="status in options.status">
             <input v-model="statuses" class="form-check-input" type="checkbox" :value="status.value">
             <label class="form-check-label">{{ status.text }}</label>
           </div>
         </div>
       </div>
-    </div>
-    <div class="card-footer p-1 text-center">
-      <a href="#" @click.prevent="collapsed = !collapsed">Zwiń / Rozwiń</a>
     </div>
   </div>
 </template>
@@ -54,11 +47,9 @@ export default {
   name: "Filters",
   data() {
     return {
-      collapsed: false,
       url: "",
 
       rooms: ["all"],
-      place: "",
       title_or_author: "",
       types: ["0", "1", "2", "5"],
       statuses: ["0", "1", "2"],
@@ -66,16 +57,16 @@ export default {
       options: {
         rooms: [],
         type: [
-          {value: "0", text: "Egzamin"},
-          {value: "1", text: "Kolokwium"},
-          {value: "2", text: "Wydarzenie"},
-          {value: "3", text: "Zajęcia"},
-          {value: "5", text: "Rezerwacja cykliczna"}
+          {value: "0", text: "Egzamin", color: "#dc3545"},
+          {value: "1", text: "Kolokwium", color: "#fd7e14"},
+          {value: "2", text: "Wydarzenie", color: "#007bff"},
+          {value: "3", text: "Zajęcia", color: "#28a745"},
+          {value: "5", text: "Rezerwacja cykliczna", color: "#6f42c1"}
         ],
         status: [
-          {value: "0", text: "Oczekujące"},
+          {value: "0", text: "Oczekujące (w paski)"},
           {value: "1", text: "Zaakceptowane"},
-          {value: "2", text: "Odrzucone"},
+          {value: "2", text: "Odrzucone (przeźroczyste)"},
         ],
       },
 
@@ -114,9 +105,6 @@ export default {
       if (this.title_or_author)
         search_params.set("title_author", this.title_or_author);
 
-      if (this.place)
-        search_params.set("place", this.place);
-
       if (this.types.length > 0)
         search_params.set("types", this.types);
       else
@@ -138,7 +126,6 @@ export default {
     // If any change occurs in filters, refetch all events so everything what
     // is displayed matches filters.
     rooms: function () { this.emit_refetch_events(); },
-    place: function () { this.emit_refetch_events(); },
     types: function () { this.emit_refetch_events(); },
     statuses: function () { this.emit_refetch_events(); },
     title_or_author: function () { this.emit_refetch_events(); }
@@ -147,5 +134,11 @@ export default {
 </script>
 
 <style scoped>
-
+.filter-box {
+  margin-bottom: 5px;
+  padding: 0 5px 0 5px;
+  color: white;
+  border-radius: 5px;
+  border: black 1px solid;
+}
 </style>

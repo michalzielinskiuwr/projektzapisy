@@ -2,117 +2,61 @@
   <div>
     <div class="modal fade" tabindex="-1" role="dialog" id="reservation_modal" ref="modal_ref">
       <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-        <div v-if="!user_info.is_admin && !(user_info.full_name == author) && edit_or_view" class="modal-content">
+
+        <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">Informacje o wydarzeniu</h5>
-            <button type="button" class="close" data-dismiss="modal">
-              <span>&times;</span>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label>Autor wydarzenia</label>
-              <input type="text" class="form-control" v-model="author" disabled>
-            </div>
-
-            <div class="form-group">
-              <label>Nazwa wydarzenia</label>
-              <input class="form-control" v-model="name" disabled>
-            </div>
-
-            <div class="form-group">
-              <label>Opis wydarzenia</label>
-              <textarea class="form-control" v-model="description" disabled></textarea>
-            </div>
-
-            <div class="form-group">
-              <label>Typ wydarzenia</label>
-              <select v-model="type" class="form-control" disabled>
-                <option v-for="option in options.type" v-bind:value="option.value">
-                  {{ option.text }}
-                </option>
-              </select>
-            </div>
-
-            <table class="table table-sm table-striped">
-              <thead>
-              <tr>
-                <td><strong>Dzień</strong></td>
-                <td><strong>Początek</strong></td>
-                <td><strong>Koniec</strong></td>
-                <td><strong>Miejsce</strong></td>
-              </tr>
-              </thead>
-              <tbody>
-              <tr v-for="(term, index) in terms">
-                <td><p>{{ term.day }}</p></td>
-                <td><p>{{ term.start }}</p></td>
-                <td><p>{{ term.end }}</p></td>
-                <td v-if="term.place == '' || term.place == null">
-                  Sale: <p v-for="room in term.rooms" style="display: inline;">{{ room }} </p>
-                </td>
-                <td v-else>
-                  {{ term.place }}
-                </td>
-              </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div v-else class="modal-content">
-          <div class="modal-header">
-            <h5 v-if="!edit_or_view" class="modal-title">Utwórz wydarzenie</h5>
-            <h5 v-else-if="edit_or_view && user_info.is_admin || user_info.full_name == author">
+            <h5 v-if="!edit_or_view" class="modal-title">
+              Utwórz wydarzenie
+            </h5>
+            <h5 v-else-if="edit_or_view && user_has_permissions()" class="modal-title">
               Edytuj wydarzenie
+            </h5>
+            <h5 v-else class="modal-title">
+              Informacje o wydarzeniu
             </h5>
             <button type="button" class="close" data-dismiss="modal">
               <span>&times;</span>
             </button>
           </div>
           <div class="modal-body">
+            <div class="alert alert-danger alert-message" role="alert" v-if="show_alert">{{ error_message }}</div>
+            <fieldset :disabled="edit_or_view && !user_has_permissions()">
             <div class="form-group" v-if="edit_or_view">
-              <label>Autor wydarzenia</label>
-              <input type="text" class="form-control" v-model="author" disabled>
+              <label for="author">Autor wydarzenia</label>
+              <input type="text" class="form-control" id="author" v-model="author" disabled>
             </div>
 
             <div class="form-group">
-              <label>Nazwa wydarzenia</label>
-              <input class="form-control" placeholder="Seminarium ANL" v-model="name">
-              <b v-if="!name">Wprowadź nazwę wydarzenia!</b>
+              <label for="name">Nazwa wydarzenia</label>
+              <input class="form-control" placeholder="Seminarium ANL" id="name" v-model="name">
             </div>
 
             <div class="form-group">
-              <label>Opis wydarzenia</label>
-              <textarea class="form-control" placeholder="Co będzie się działo?" v-model="description"></textarea>
-              <b v-if="!description">Wprowadź opis wydarzenia!</b>
+              <label for="description">Opis wydarzenia</label>
+              <textarea class="form-control" placeholder="Co będzie się działo?" id="description" v-model="description"></textarea>
             </div>
 
-            <div class="form-group">
-              <label>Wydarzenie widoczne dla wszystkich użytkowników</label>
-              <select v-model="visible" class="form-control">
+            <div class="form-group" v-if="field_is_editable()">
+              <label for="visibility">Wydarzenie widoczne dla wszystkich użytkowników</label>
+              <select v-model="visible" class="form-control" id="visibility">
                 <option v-for="option in options.visible" v-bind:value="option.value">
                   {{ option.text }}
                 </option>
               </select>
             </div>
 
-            <div class="form-group" v-if="user_info.is_admin || user_info.is_employee">
-              <label>Typ wydarzenia</label>
-              <select v-model="type" class="form-control">
-                <option v-for="option in options.type" v-bind:value="option.value">
+            <div class="form-group" v-if="edit_or_view || user_info.is_admin || user_info.is_employee">
+              <label for="type">Typ wydarzenia</label>
+              <select id="type" v-model="type" class="form-control" :disabled="!(user_info.is_admin || user_info.is_employee)">
+                <option v-for="option in options.type" v-bind:value="option.value" :disabled="option.value === '5'">
                   {{ option.text }}
                 </option>
               </select>
             </div>
 
-            <div class="form-group">
-              <label>Status wydarzenia</label>
-              <select v-model="status" class="form-control" v-if="user_info.is_admin">
-                <option v-for="option in options.status" v-bind:value="option.value">
-                  {{ option.text }}
-                </option>
-              </select>
-              <select v-model="status" class="form-control" disabled v-else>
+            <div class="form-group" v-if="edit_or_view && user_has_permissions()">
+              <label for="status">Status wydarzenia</label>
+              <select id="status" v-model="status" class="form-control" :disabled="!user_info.is_admin">
                 <option v-for="option in options.status" v-bind:value="option.value">
                   {{ option.text }}
                 </option>
@@ -123,11 +67,11 @@
               <thead>
               <tr>
                 <td class="align-middle"><strong>Dzień</strong></td>
-                <td class="align-middle" style="width: 10%"><strong>Początek</strong></td>
-                <td class="align-middle" style="width: 10%"><strong>Koniec</strong></td>
-                <td class="align-middle" style="width: 30%"><strong>Miejsce</strong></td>
-                <td class="align-middle" style="width: 35%"><strong>Interakcja</strong></td>
-                <td></td>
+                <td class="align-middle"><strong>Początek</strong></td>
+                <td class="align-middle"><strong>Koniec</strong></td>
+                <td class="align-middle"><strong>Miejsce</strong></td>
+                <td class="align-middle" v-if="field_is_editable()"></td>
+                <td v-if="field_is_editable()"></td>
               </tr>
               </thead>
               <tbody>
@@ -140,7 +84,7 @@
                     <input class="form-control" type="time" step="60" v-model="term.end">
                 </td>
                 <td>
-                  <div class="dropdown dropup">
+                  <div class="dropdown dropup" v-if="field_is_editable()">
                     <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                       Wybierz
                     </button>
@@ -164,7 +108,7 @@
                            v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
                           </div>
                         </div>
-                        <div class="progress bg-light term-occupied" style="height: 14px;"v-if="!isFetching_progressbars_terms">
+                        <div class="progress bg-light term-occupied" style="height: 14px;" v-if="!isFetching_progressbars_terms">
                           <div role="progressbar" class="progress-bar" style="visibility: visible"
                            v-for="progressbar_info in progressbars_info[index][room.number][2]" v-bind:key="progressbar_info.id"
                            v-bind:class="progressbar_info.class" v-bind:style="{ width: progressbar_info.width }">
@@ -188,8 +132,18 @@
                       </button>
                     </div>
                   </div>
+                  <div v-if="term.rooms.length > 0">
+                    Sale:
+                    <p v-for="(room, index) in term.rooms" :key="index" style="display:inline">
+                      {{ room }}
+                    </p>
+                  </div>
+                  <div v-if="term.place">
+                    Miejsce poza II:
+                    {{ term.place }}
+                  </div>
                 </td>
-                <td>
+                <td v-if="field_is_editable()">
                   <button class="btn btn-info" data-toggle="collapse" style="margin-bottom: 5px;"
                           :data-target="'#conflicts' + index">
                     Konflikty
@@ -202,24 +156,28 @@
                     </div>
                   </div>
                 </td>
-                <td>
-                  <button v-on:click="remove_term(index);" class="btn btn-danger">Usuń</button>
+                <td v-if="field_is_editable()">
+                  <button v-on:click="remove_term(index);" class="btn btn-danger">-</button>
                 </td>
               </tr>
               </tbody>
             </table>
-            <div>
+            <div v-if="field_is_editable()">
               <button class="btn btn-primary" @click="add_term">Dodaj termin</button>
             </div>
+            </fieldset>
           </div>
-          <div class="modal-footer" v-if="edit_or_view">
+          <div class="modal-footer" v-if="!edit_or_view">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
+            <button type="button" class="btn btn-success" @click="add_to_db">Utwórz wydarzenie</button>
+          </div>
+          <div class="modal-footer" v-else-if="edit_or_view && user_has_permissions()">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
             <button type="button" class="btn btn-danger" @click="remove_from_db(url)">Usuń wydarzenie</button>
             <button type="button" class="btn btn-success" @click="edit_in_db">Edytuj wydarzenie</button>
           </div>
           <div class="modal-footer" v-else>
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
-            <button type="button" class="btn btn-success" @click="add_to_db">Utwórz wydarzenie</button>
           </div>
         </div>
       </div>
@@ -272,6 +230,9 @@ export default {
       },
 
       edit_or_view: false,
+      show_alert: false,
+      error_message: "",
+
       url: "",
       user_info: {
         full_name: "",
@@ -478,9 +439,20 @@ export default {
       this.$emit('refetchEvents');
     },
 
+    user_has_permissions: function () {
+      return this.user_info.is_admin || this.user_info.full_name == this.author;
+    },
+
+    field_is_editable: function() {
+      // Editable fields are visible only when user wants to create event or
+      // when user has permissions to edit it (is admin or event author).
+      return !this.edit_or_view || this.user_has_permissions();
+    },
+
     // This modal is displayed only when adding event, it supports either adding events
     // by clicking the "Create event" button and selecting hours in FullCalendar
     show_modal_add: function (timeRange) {
+      this.clear_modal();
       this.edit_or_view = false; // do not print extra fields (available in edit/view modes only)
       $('#reservation_modal').modal('show');
 
@@ -520,6 +492,7 @@ export default {
       if (info.event.url.includes("course"))
         return;
 
+      this.clear_modal();
       this.edit_or_view = true;
       info.jsEvent.preventDefault();
 
@@ -571,6 +544,27 @@ export default {
       $('#reservation_modal').modal('hide');
     },
 
+    clear_modal: function () {
+      this.author = "";
+      this.name = "";
+      this.description = "";
+      this.type = "2";
+      this.status = "0";
+      this.visible = true;
+      this.terms = [];
+      this.error_message = "";
+      this.show_alert = false;
+      this.url = "";
+      this.progressbars_info = [];
+      this.progressbars_terms = {};
+      this.isFetching_progressbars_terms = false;
+      this.original_terms = [];
+    },
+
+    hide_modal: function () {
+      $('#reservation_modal').modal('hide');
+    },
+
     // Add a term row in the add/edit event modal
     add_term: function () {
       let elem = document.createElement('tr');
@@ -593,6 +587,7 @@ export default {
 
     // Send reservation's data in POST request, so it gets saved in database.
     add_to_db: async function () {
+      let that = this; // without it, closing modal without errors is impossible
       await axios.post("events/", {
         "title": this.name,
         "description": this.description,
@@ -601,13 +596,24 @@ export default {
         "terms": this.terms
       })
           .then(function (response) {
-            alert("Wydarzenie utworzono pomyślnie");
+            that.hide_modal();
           })
           .catch(function (error) {
-            alert("Nie udało się utworzyć wydarzenia");
-          });
+            that.show_alert = true;
+            if (error.response.status == 400) {
+              if (Array.isArray(error.response.data) && error.response.data.length) {
+                // returned JSON with conflicts
+                let conflicts = "";
+                for (const conflict of error.response.data)
+                  conflicts += "\nWydarzenie \"" + conflict.title + "\" w sali "
+                      + conflict.room + " od " + conflict.start + " do " + conflict.end;
 
-      this.clear_and_hide_modal();
+                that.error_message = "Nie udało się utworzyć wydarzenia. Nastąpiły konflikty z:" + conflicts;
+              }
+              else // otherwise some term is not filled completely
+                that.error_message = "Któryś z termów jest nieuzupełniony.";
+            }
+          });
     },
 
     // Send edited reservation's data in POST
@@ -615,6 +621,7 @@ export default {
       // If user who is not an admin tries to edit an event, its status has to be
       // changed to "pending" - otherwise unprivileged users would not be able to
       // edit events created by them.
+      let that = this;
       await axios.post(this.url, {
         "title": this.name,
         "description": this.description,
@@ -624,13 +631,24 @@ export default {
         "terms": this.terms
       })
           .then(function (response) {
-            alert("Edycja wydarzenia zakończona pomyślnie");
+            that.hide_modal();
           })
           .catch(function (error) {
-            alert("Edycja wydarzenia zakończona niepowodzeniem");
-          });
+            that.show_alert = true;
+            if (error.response.status == 400) {
+              if (Array.isArray(error.response.data) && error.response.data.length) {
+                // returned JSON with conflicts
+                let conflicts = "";
+                for (const conflict of error.response.data)
+                  conflicts += "\nWydarzenie \"" + conflict.title + "\" w sali "
+                      + conflict.room + " od " + conflict.start + " do " + conflict.end;
 
-      this.clear_and_hide_modal();
+                that.error_message = "Nie udało się utworzyć wydarzenia. Nastąpiły konflikty z:" + conflicts;
+              }
+              else // otherwise some term is not filled completely
+                that.error_message = "Któryś z termów jest nieuzupełniony.";
+            }
+          });
     },
 
     // Remove event with given URL from database
@@ -638,15 +656,8 @@ export default {
       if (!url)
         return;
 
-      await axios.post('delete-event/' + parseInt(url.match(/\d+/)) + '/')
-          .then(function (response) {
-            alert("Wydarzenie usunięto pomyślnie");
-          })
-          .catch(function (error) {
-            alert("Nie udało się usunąć wydarzenia");
-          });
-
-      this.clear_and_hide_modal();
+      await axios.post('delete-event/' + parseInt(url.match(/\d+/)) + '/');
+      this.hide_modal();
     },
   }
 }
@@ -691,6 +702,10 @@ export default {
   visibility: hidden;
 }
 
+.alert-message {
+  white-space: pre;
+}
+
 select[multiple] {
   height: 35px !important;
   transition: height 0.5s;
@@ -699,4 +714,5 @@ select[multiple] {
 select[multiple]:focus {
   height: 120px !important;
 }
+
 </style>

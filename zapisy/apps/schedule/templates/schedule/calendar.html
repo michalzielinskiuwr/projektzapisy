@@ -21,28 +21,10 @@
 
 <div class="alert alert-info fade show">
     <div class="row">
-        <div class="col-md-8" style="text-align: justify;">
+        <div class="col-md-12" style="text-align: justify;">
             Skorzystaj z poniższych filtrów, aby sprecyzować wyszukiwanie wydarzeń.
             Aby stworzyć wydarzenie, wybierz w kalendarzu termin, w którym chcesz
             je utworzyć. Szczegółowe informacje ukażą się po wybraniu wydarzenia.
-            Legenda obok przedstawia jaki kolor odpowiada wybranemu typowi. Nazwy
-            w legendzie oznaczone gwiazdką (*) wskazują na to, że dany kolor jest
-            wykorzystywany w otoczce wydarzenia.
-        </div>
-        <div class="col-md-4 legend">
-            <div class="legend-scale">
-                <ul class="legend-labels">
-                    <li><span style='background:#539CDB;'></span>Kolokwium</li>
-                    <li><span style='background:#0588FA;'></span>Egzamin</li>
-                    <li><span style='background:#0423B0;'></span>Wydarzenie</li>
-                    <li><span style='background:#223487;'></span>Rezerwacja cykliczna</li>
-                    <li><span style='background:#121F59;'></span>Zajęcia</li>
-                    <li><span style='background:#D3BB5A;'></span>Wydarzenie niewidoczne</li>
-                    <li><span style='background:#0F0;'></span>Zaakceptowane*</li>
-                    <li><span style='background:#FF0;'></span>Oczekujące*</li>
-                    <li><span style='background:#F00;'></span>Odrzucone*</li>
-                </ul>
-            </div>
         </div>
     </div>
 </div>
@@ -51,36 +33,6 @@
 
 <div id="calendar"></div>
 {% render_bundle 'schedule-fullcalendar' %}
-
-<style type='text/css'>
-    .legend .legend-scale ul {
-        columns: 2;
-        -webkit-columns: 2;
-        -moz-columns: 2;
-        margin: 0 0 5px;
-        padding: 0;
-        float: left;
-        list-style: none;
-    }
-
-    .legend .legend-scale ul li {
-        font-size: 80%;
-        list-style: none;
-        margin-left: 0;
-        line-height: 18px;
-        margin-bottom: 2px;
-    }
-
-    .legend ul.legend-labels li span {
-        display: block;
-        float: left;
-        height: 16px;
-        width: 30px;
-        margin-right: 5px;
-        margin-left: 0;
-        border: 1px solid #999;
-    }
-</style>
 
 {% endblock calendarview %}
 {% endblock all-content %}
