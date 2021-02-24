@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from typing import NamedTuple, Optional, List, Dict, Set, Tuple
 
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest, HttpRequest
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import render
 from django.core.validators import ValidationError
 from django.urls import reverse
@@ -118,7 +119,6 @@ def _check_and_prepare_get_data(request, require_dates: bool = True
         data['visible'] = bool(visible) if visible is not None else None
         ignore_conflicts = request.GET.get('ignore_conflicts', None)
         data['ignore_conflicts'] = bool(ignore_conflicts) if ignore_conflicts is not None else None
-        data['place'] = str(request.GET.get('place', ''))
         data['title_or_author'] = str(request.GET.get('title_author', ''))
         rooms = request.GET.get('rooms', [])
         data['rooms'] = rooms.split(',') if rooms else rooms
@@ -147,8 +147,6 @@ def terms(request) -> JsonResponse:
                                                        data['end']]).select_related('event', 'event__author')
     if data['rooms']:
         query = query.filter(room__number__in=data['rooms'])
-    if data['place']:
-        query = query.filter(place=data['place'])
     if data['types']:
         query = query.filter(event__type__in=data['types'])
     if data['statuses']:
@@ -157,11 +155,17 @@ def terms(request) -> JsonResponse:
         author_names = data['title_or_author'].split()
         first_name = author_names[0]
         last_name = author_names[-1]
-        query = query.filter(Q(event__title__icontains=data['title_or_author']) |
-                             Q(event__author__first_name__icontains=first_name) |
-                             Q(event__author__first_name__icontains=last_name) |
-                             Q(event__author__last_name__icontains=first_name) |
-                             Q(event__author__last_name__icontains=last_name))
+        # User typed only one word, first name or last name
+        if first_name == last_name:
+            query = query.filter(Q(event__title__icontains=data['title_or_author']) |
+                                 Q(event__author__first_name__icontains=first_name) |
+                                 Q(event__author__last_name__icontains=first_name))
+        else:
+            query = query.filter(Q(event__title__icontains=data['title_or_author']) |
+                                 (Q(event__author__first_name__icontains=first_name) &
+                                  Q(event__author__last_name__icontains=last_name)) |
+                                 (Q(event__author__first_name__icontains=last_name) &
+                                  Q(event__author__last_name__icontains=first_name)))
     if data['visible'] is not None:
         query = query.filter(event__visible=data['visible'])
     if data['ignore_conflicts'] is not None:
@@ -184,7 +188,8 @@ def terms(request) -> JsonResponse:
     return JsonResponse(payload, safe=False)
 
 
-def _get_event_author_name_and_url(author: Event.author, user: 'HttpRequest.user') -> Tuple[str or None, str or None]:
+def _get_author_name_and_url(author: User, logged_user: User
+                             ) -> Tuple[str or None, str or None]:
     """Returns tuple with event author full name and url to author in users app.
 
     Checks if event author is student or employee. If event author is student
@@ -198,7 +203,7 @@ def _get_event_author_name_and_url(author: Event.author, user: 'HttpRequest.user
     else:
         author_url = reverse('student-profile', args=[author.pk])
         student = Student.objects.get(user=author)
-        if not student.consent_granted() and not user.employee:
+        if not student.consent_granted() and not logged_user.employee:
             return "Student ukryty", None
     return author.get_full_name(), author_url
 
@@ -376,13 +381,13 @@ def _group_terms_same_date_and_time(terms: List[Term]) -> List[Dict]:
     return grouped_terms
 
 
-def _get_event_info_to_send(event: Event, user: 'HttpRequest.user') -> Dict[str, str or List[Dict]]:
+def _get_event_info_to_send(event: Event, user: User) -> Dict[str, str or List[Dict]]:
     """Returns Dict with all needed info from Event for frontend.
 
     Example usage is when client clicked single event in fullcalendar.
     """
     terms = event.term_set.all().select_related('room')
-    author_full_name, author_url = _get_event_author_name_and_url(event.author, user)
+    author_full_name, author_url = _get_author_name_and_url(event.author, user)
     return {"terms": _group_terms_same_date_and_time(terms),
             "description": event.description,
             "author": author_full_name,
