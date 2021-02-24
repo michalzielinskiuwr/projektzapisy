@@ -152,20 +152,11 @@ def terms(request) -> JsonResponse:
     if data['statuses']:
         query = query.filter(event__status__in=data['statuses'])
     if data['title_or_author']:
-        author_names = data['title_or_author'].split()
-        first_name = author_names[0]
-        last_name = author_names[-1]
-        # User typed only one word, first name or last name
-        if first_name == last_name:
-            query = query.filter(Q(event__title__icontains=data['title_or_author']) |
-                                 Q(event__author__first_name__icontains=first_name) |
-                                 Q(event__author__last_name__icontains=first_name))
-        else:
-            query = query.filter(Q(event__title__icontains=data['title_or_author']) |
-                                 (Q(event__author__first_name__icontains=first_name) &
-                                  Q(event__author__last_name__icontains=last_name)) |
-                                 (Q(event__author__first_name__icontains=last_name) &
-                                  Q(event__author__last_name__icontains=first_name)))
+        filter_words = data['title_or_author'].split()
+        for word in filter_words:
+            query = query.filter(Q(event__title__icontains=word) |
+                                 Q(event__author__first_name__icontains=word) |
+                                 Q(event__author__last_name__icontains=word))
     if data['visible'] is not None:
         query = query.filter(event__visible=data['visible'])
     if data['ignore_conflicts'] is not None:
