@@ -169,12 +169,12 @@
           </div>
           <div class="modal-footer" v-if="!edit_or_view">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
-            <button type="button" class="btn btn-success" @click="add_to_db">Utwórz wydarzenie</button>
+            <button type="button" class="btn btn-success" @click="check_inputs_and_add_to_db">Utwórz wydarzenie</button>
           </div>
           <div class="modal-footer" v-else-if="edit_or_view && user_has_permissions()">
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
             <button type="button" class="btn btn-danger" @click="remove_from_db(url)">Usuń wydarzenie</button>
-            <button type="button" class="btn btn-success" @click="edit_in_db">Edytuj wydarzenie</button>
+            <button type="button" class="btn btn-success" @click="check_inputs_and_edit_in_db">Edytuj wydarzenie</button>
           </div>
           <div class="modal-footer" v-else>
             <button type="button" class="btn btn-secondary" data-dismiss="modal">Anuluj</button>
@@ -585,6 +585,22 @@ export default {
       this.original_terms.splice(index, 1);
     },
 
+    check_inputs: function () {
+      if (this.name && this.description)
+        return true;
+
+      let errors = "";
+      if (!this.name)
+        errors += "Nie wprowadzono nazwy wydarzenia.\n";
+
+      if (!this.description)
+        errors += "Nie wprowadzono opisu wydarzenia.\n";
+
+      this.error_message = errors;
+      this.show_alert = true;
+      return false;
+    },
+
     // Send reservation's data in POST request, so it gets saved in database.
     add_to_db: async function () {
       let that = this; // without it, closing modal without errors is impossible
@@ -614,6 +630,11 @@ export default {
                 that.error_message = "Któryś z termów jest nieuzupełniony.";
             }
           });
+    },
+
+    check_inputs_and_add_to_db: function () {
+      if (this.check_inputs())
+        this.add_to_db();
     },
 
     // Send edited reservation's data in POST
@@ -649,6 +670,11 @@ export default {
                 that.error_message = "Któryś z termów jest nieuzupełniony.";
             }
           });
+    },
+
+    check_inputs_and_edit_in_db: function () {
+      if (this.check_inputs())
+        this.edit_in_db();
     },
 
     // Remove event with given URL from database
