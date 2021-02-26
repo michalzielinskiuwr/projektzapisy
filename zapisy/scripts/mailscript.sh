@@ -1,4 +1,4 @@
 #!/bin/bash
-source /home/zapisy/env36/bin/activate
-cd /home/zapisy/projektzapisy/current/zapisy
+source /home/zapisy/deploy/current/venv/bin/activate
+cd /home/zapisy/deploy/current/zapisy
 python manage.py send_mail

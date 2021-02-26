@@ -3,7 +3,7 @@ from rest_framework import routers
 from .views import (ClassroomViewSet, CourseViewSet, DesiderataOtherViewSet, DesiderataViewSet,
                     EmployeeViewSet, GroupViewSet, RecordViewSet, SemesterViewSet,
                     SingleVoteViewSet, StudentViewSet,
-                    SystemStateViewSet, TermViewSet)
+                    SystemStateViewSet, TermViewSet, CompletedCoursesViewSet)
 
 router = routers.DefaultRouter()
 router.register(r'semesters', SemesterViewSet)
@@ -18,3 +18,4 @@ router.register(r'desiderata-others', DesiderataOtherViewSet)
 router.register(r'systemstate', SystemStateViewSet)
 router.register(r'votes', SingleVoteViewSet, 'Votes')
 router.register(r'terms', TermViewSet)
+router.register(r'completed-courses', CompletedCoursesViewSet)

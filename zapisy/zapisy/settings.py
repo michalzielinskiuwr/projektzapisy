@@ -2,6 +2,8 @@ import os
 
 import environ
 from django.contrib.messages import constants as messages
+from django.core.exceptions import PermissionDenied
+from django.http import Http404
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -231,6 +233,7 @@ INSTALLED_APPS = (
     'apps.grade.ticket_create',
     'apps.schedulersync',
     'apps.theses',
+    'apps.effects',
     'django_extensions',
     'django_filters',
     'bootstrap_pagination',
@@ -316,7 +319,16 @@ SECURE_HSTS_PRELOAD = True
 DEBUG_TOOLBAR_ALLOWED_USERS = env.list('DEBUG_TOOLBAR_ALLOWED_USERS', default=[])
 DEBUG_TOOLBAR_PANELS = env.list('DEBUG_TOOLBAR_PANELS', default=[])
 
-ROLLBAR = env.dict('ROLLBAR', default={})
+ROLLBAR = {
+    'access_token': env.str('ROLLBAR_TOKEN', default=''),
+    'environment': env.str('ROLLBAR_ENV', default=''),
+    'branch': env.str('ROLLBAR_BRANCH', default=''),
+    'root': BASE_DIR,
+    'exception_level_filters': [
+        (PermissionDenied, 'warning'),
+        (Http404, 'warning')
+    ]
+}
 
 # Message classes set to be compatible with Bootstrap 4 alerts.
 MESSAGE_TAGS = {

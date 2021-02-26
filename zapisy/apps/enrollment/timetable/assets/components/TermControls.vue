@@ -6,7 +6,6 @@ import Component from "vue-class-component";
 import Vue from "vue";
 import TermComponent from "./Term.vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
-import { faCarSide } from "@fortawesome/free-solid-svg-icons/faCarSide";
 
 import { Term, Group } from "../models";
 
@@ -24,7 +23,6 @@ const TermControlsProps = Vue.extend({
 })
 export default class TermControlsComponent extends TermControlsProps {
   controlsVisible: boolean = false;
-  faCarSide = faCarSide;
 
   get group(): Group {
     return this.term.group;
@@ -73,14 +71,36 @@ export default class TermControlsComponent extends TermControlsProps {
       this.$store.dispatch("groups/dequeue", this.term.group);
     }
   }
+
+  showControls() {
+    this.controlsVisible = true;
+    window.addEventListener("touchend", this.hideControls);
+  }
+
+  // Hides controls popup whenever there is a "mouseout" event on the Term
+  // component or any touch event outside of it.
+  hideControls(event: Event) {
+    // Do not hide controls on touch events inside of the Term.
+    if (
+      event.type === "touchend" &&
+      ((this.$refs.term as Vue).$refs.root as Element).contains(
+        event.target as Node
+      )
+    ) {
+      return;
+    }
+    this.controlsVisible = false;
+    window.removeEventListener("touchend", this.hideControls);
+  }
 }
 </script>
 
 <template>
   <Term
     :term="term"
-    @mouseover.native="controlsVisible = true"
-    @mouseout.native="controlsVisible = false"
+    @mouseover.native="showControls"
+    @mouseout.native="hideControls"
+    ref="term"
   >
     <transition name="fade">
       <div class="controls" v-if="controlsVisible">
@@ -89,32 +109,44 @@ export default class TermControlsComponent extends TermControlsProps {
           class="unpin"
           title="Odepnij grupę od planu."
           @click="unpin()"
-        ></span>
+        >
+          <font-awesome-icon
+            icon="thumbtack"
+            :transform="{ rotate: 45 }"
+            fixed-width
+          />
+        </span>
         <span
           v-else
           class="pin"
           title="Przypnij grupę do planu."
           @click="pin()"
-        ></span>
+        >
+          <font-awesome-icon icon="thumbtack" rotation="90" fixed-width />
+        </span>
 
         <span
           v-if="canEnqueue"
           class="enqueue"
           title="Zapisz do grupy/kolejki."
           @click="enqueue()"
-        ></span>
+        >
+          <font-awesome-icon icon="pencil-alt" fixed-width />
+        </span>
         <span
           v-if="canDequeue"
           class="dequeue"
           title="Wypisz z grupy/kolejki."
           @click="dequeue()"
-        ></span>
+        >
+          <font-awesome-icon icon="ban" fixed-width />
+        </span>
         <span
           v-if="term.group.autoEnrollment"
           class="auto-enrollment"
           title="Grupa z auto-zapisem."
         >
-          <font-awesome-icon icon="car-side" transform="shrink-3 left-2" />
+          <font-awesome-icon icon="car-side" fixed-width />
         </span>
       </div>
     </transition>
@@ -132,47 +164,71 @@ export default class TermControlsComponent extends TermControlsProps {
 }
 
 .controls {
-  position: absolute;
   background: white;
-  top: 0;
-  left: 0;
+
+  position: absolute;
+  top: -1px;
+  left: -1px;
+
   cursor: default;
-  width: auto;
   border: 1px solid #666666;
-  border-top: 0;
-  border-left: 0;
   border-radius: 4px 0;
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
   z-index: 30;
+
+  display: flex;
+  flex-direction: column;
 }
 
 .controls span {
   display: block;
-  width: 12px;
-  height: 12px;
-  margin: 3px;
-  overflow: hidden;
+  padding: 3px;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
   cursor: pointer;
 }
-</style>
 
-<style lang="scss">
-span.pin {
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAQAAAD8fJRsAAAAi0lEQVQY032PMQoCUQxEg4iCdgoK2qlvDmLhWfYydl5AbLyXIh9stnKxSSw+f11FTCAE3gzDmP0f9SVNfwA2aji3sqFmbxCq2asicdWDKJoVoY81DRiz1JYg5HJCnkHiTsMT/3KYmbFoHSHPXwlfKxQE+bpKOCiU2DHhwJELtwLmOlF1eo263Xvdyi8RHEhw4FPwSQAAAABJRU5ErkJggg==);
-}
+// For devices with large screens where days are displayed one below another.
+// Bootstrap's convention: https://getbootstrap.com/docs/4.5/layout/overview/#containers
+@media (max-width: 992px) {
+  .controls {
+    position: absolute;
+    top: -63px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 4px;
 
-span.unpin {
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAQAAAD8fJRsAAAAsUlEQVQY02NgQAKqpar/VXwZ0IGKh+p/MMxGFZZVeab6DwTVfqshpFQ5VLer/lf7D5T4rwbEqr4MqlwqhcouauWqEEGgMAiq/mdQCQQKfVb9pQYVhChQaWZQZlddpwbR/g8s+V/1jVos2Hx1NrW1UCGQ9Ck1FYSLWsHO/Kf6V7VLhQ8h7KD6QWWaKlCX6lcVH7iwspLKTuUABgYlNtUtQOPqET6YpqIHYalxqEar8sPEAdj8UUYH1HpBAAAAAElFTkSuQmCC);
-}
+    min-width: 60px;
+    flex-direction: row;
 
-span.enqueue {
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAQAAAD8fJRsAAAAoklEQVQY02XQLw6DMBiH4Q+FKeESS0UPMA+uYqS4Db+r9CrIZWZD04wjVMBI3c9PtWZjkn953SNfAq1KbHVx5o1iiRGYy29GhGMw/ZJTq2SrfT2JcHZLLmXHA5+0v7e22jEP0ow5kj13VoGBCARm1YJLpIhAhHjMpNkyiHB4NtpvGUTdSQz1T3vZWjUziPTAP6J/NC4DmxlE168eXgUOiNdz/lSxl2uEe8+QAAAAAElFTkSuQmCC);
-}
+    // Tooltip arrow.
+    &:before {
+      content: "";
+      display: block;
+      position: absolute;
+      left: calc(50% - 10px);
+      top: 100%;
+      border: 10px solid transparent;
+      border-top-color: black;
+    }
+    &:after {
+      content: "";
+      display: block;
+      position: absolute;
+      left: calc(50% + 1px - 10px);
+      top: 100%;
+      border: 9px solid transparent;
+      border-top-color: white;
+    }
+  }
 
-span.dequeue {
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAYAAABWdVznAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH4ggOEhs2PtkFxgAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAAE5SURBVCjPfZCxSlxhEIW/M/Pf+7uSXddFcEkTSBXClmks7ISgpLBIKSwoAYsEwSLkPdJISJmUpgo+QbBIIalELANuG1ACbvTeSeEim0v0lMOcM+cbACEt49oFetwjd9zBHGyN0AbSQ7ATiPP/7A8knju4QC0sCfkqUT8pLUZVMALAmMXyOlFvRehoYu4WUCyitInSN+FfMZag3QHbQX6A0gqAmjWhHKB4d8MTv7DoQvpANf5yD14aoPwDpUNUvmkkNvRgdp4r3kPVIVSjeIYYQZzeIE1L1uf39UeoH6PYAxuCHYO/xHO/0b7s4nkPyz9R8fZ2PjM/h4rPeH5Fe2HCnHG8tY21zlCxD7nzT5iVT5Hvg/oJgDE9uHoBdgl8QtUFMWWo/xyDf8fj0eRCO6M0BL0G2nd8LpGwv420RBxssgl5AAAAAElFTkSuQmCC);
-}
-span.auto-enrollment {
-  font-size: 12px;
+  .controls span {
+    display: inline-block;
+    font-size: 40px;
+    padding: 5px;
+    width: 60px;
+    height: 50px;
+  }
 }
 </style>
