@@ -3,7 +3,7 @@ import json
 from operator import attrgetter, itemgetter
 from datetime import datetime, timedelta
 from itertools import groupby
-from typing import NamedTuple, Optional, List, Dict, Set, Tuple
+from typing import Literal, NamedTuple, Optional, List, Dict, Set, Tuple
 
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, permission_required
@@ -44,7 +44,7 @@ def calendar(request):
 
 
 def chosen_days_terms(request) -> JsonResponse:
-    """Send all accepted terms from received days."""
+    """Returns a mapping from room number to an array of time intervals when it is reserved."""
     days = request.GET.get('days', [])
     days = days.split(',') if isinstance(days, str) else days
     if "" in days:
@@ -54,7 +54,9 @@ def chosen_days_terms(request) -> JsonResponse:
             day = datetime.strptime(day, '%Y-%m-%d')
     except ValueError:
         return HttpResponseBadRequest('Jedna z przesłanych dat jest złego formatu.')
-    terms = Term.objects.filter(day__in=days, room__isnull=False,
+    
+    # TODO Should we also display STATUS_PENDING events?
+    terms = Term.objects.filter(day__in=days, room__isnull=False, room__can_reserve=True,
                                 event__status=Event.STATUS_ACCEPTED).select_related('room')
     payload = {}
     rooms = Classroom.get_in_institute(reservation=True)
@@ -505,14 +507,13 @@ def events(request) -> JsonResponse:
     if data['statuses']:
         query = query.filter(status__in=data['statuses'])
     if data['title_or_author']:
-        author_names = data['title_or_author'].split()
-        first_name = author_names[0]
-        last_name = author_names[-1]
-        query = query.filter(Q(title__icontains=data['title_or_author']) |
-                             Q(author__first_name__icontains=first_name) |
-                             Q(author__first_name__icontains=last_name) |
-                             Q(author__last_name__icontains=first_name) |
-                             Q(author__last_name__icontains=last_name))
+        query_words = data['title_or_author'].split()
+        for word in query_words:
+            query = query.filter(
+                Q(title__icontains=word) |
+                Q(author__first_name__icontains=word) |
+                Q(author__last_name__icontains=word)
+            )
     query = query.filter(visible=data['visible'])
     query = query.order_by('-created')
     query = Paginator(query, 20).get_page(data['page'])

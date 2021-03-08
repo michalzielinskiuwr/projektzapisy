@@ -212,7 +212,7 @@ class Term(models.Model):
         return conflicts
 
     def __str__(self):
-        return '{0:s}: {1:s} - {2:s}'.format(self.day, self.start, self.end)
+        return f'{self.day}: {self.start} - {self.end}'
 
 
 @receiver(models.signals.pre_delete, sender=CourseTerm)
