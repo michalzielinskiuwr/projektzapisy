@@ -45,23 +45,28 @@ Example usage:
 """
 
 import os
+from typing import List
 
-import environ
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+import environ
+import rollbar
 
 from apps.enrollment.courses.models import CourseInstance
 from apps.enrollment.courses.models.group import Group, GroupType
 from apps.enrollment.courses.models.semester import Semester
 from apps.enrollment.courses.models.term import Term
 from apps.schedulersync.models import TermSyncData
-
-from .scheduler_data import SchedulerData, SZTerm
-from .scheduler_mapper import SchedulerMapper
-from .slack import Slack, Summary, SlackUpdate
+from apps.schedulersync.scheduler_data import SchedulerData
+from apps.schedulersync.scheduler_mapper import SchedulerMapper, SZTerm
+from apps.schedulersync.slack import Slack, Summary, SlackUpdate
 
 
 class Command(BaseCommand):
+    def __init__(self,  *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.summary = Summary()
+
     def add_arguments(self, parser):
         parser.add_argument('api_base_url', help='Should look like this: '
                                                  'http://scheduler.ii.uni.wroc.pl:8000')
@@ -94,7 +99,7 @@ class Command(BaseCommand):
                 'term', 'term__group').prefetch_related('term__classrooms').get(
                 scheduler_id=term_data.scheduler_id, term__group__course__semester=self.semester)
 
-            self.summary.used_scheduler_ids.append(sync_data_object.scheduler_id)
+            self.summary.used_scheduler_ids.add(sync_data_object.scheduler_id)
             diffs = []
             term = sync_data_object.term
             if term.group.course != term_data.course:
@@ -132,7 +137,7 @@ class Command(BaseCommand):
             diffs.extend(prop_updater(term, term_data, ['dayOfWeek', 'start_time', 'end_time']))
             diffs.extend(prop_updater(term.group, term_data, ['teacher']))
 
-            if set(term.classrooms.all()) != term_data.classrooms:
+            if set(term.classrooms.all()) != set(term_data.classrooms):
                 diffs.append(SlackUpdate('classrooms', term.classrooms.all(), term_data.classrooms))
                 term.classrooms.set(term_data.classrooms)
 
@@ -152,12 +157,14 @@ class Command(BaseCommand):
             else:
                 group = Group.objects.create(course=term_data.course, teacher=term_data.teacher,
                                              type=term_data.type, limit=term_data.limit)
-            term = Term.objects.create(dayOfWeek=term_data.dayOfWeek, start_time=term_data.start_time,
-                                       end_time=term_data.end_time, group=group)
+            term = Term.objects.create(dayOfWeek=term_data.dayOfWeek,
+                                       start_time=term_data.start_time,
+                                       end_time=term_data.end_time,
+                                       group=group)
             term.classrooms.set(term_data.classrooms)
             TermSyncData.objects.create(term=term, scheduler_id=term_data.scheduler_id)
-            self.summary.used_scheduler_ids.append(term_data.scheduler_id)
             self.summary.created_terms.append(term)
+            self.summary.used_scheduler_ids.add(term_data.scheduler_id)
 
     def remove_unused_terms_groups(self):
         groups_to_remove = set()
@@ -181,6 +188,24 @@ class Command(BaseCommand):
         environ.Env.read_env(os.path.join(BASE_DIR, os.pardir, 'env', '.env'))
         return env
 
+    def report_error(self):
+        """Reports an error that occurred during an import."""
+        env = self.get_secrets_env()
+        rollbar.init(access_token=env.str('ROLLBAR_TOKEN'),
+                     environment=env.str('ROLLBAR_ENV'),
+                     branch=env.str('ROLLBAR_BRANCH'))
+        rollbar.report_exc_info(level='error')
+
+    def update_terms(self, mapped_terms: List[SZTerm], dont_delete_terms_flag):
+        for i, term in enumerate(mapped_terms):
+            self.stdout.write(f"Updating terms and groups -- {i}/{len(mapped_terms)}", ending='\r')
+            self.stdout.flush()
+            if term.course is not None:
+                self.create_or_update_group_and_term(term)
+
+        if not dont_delete_terms_flag:
+            self.remove_unused_terms_groups()
+
     def import_from_api(self, dont_delete_terms_flag, write_to_slack_flag, interactive_flag):
         secrets_env = self.get_secrets_env()
         scheduler_data = SchedulerData(self.api_login_url,
@@ -191,14 +216,7 @@ class Command(BaseCommand):
         scheduler_data.get_scheduler_data()
         scheduler_mapper = SchedulerMapper(interactive_flag, self.summary, self.semester)
         scheduler_mapper.map_scheduler_data(scheduler_data)
-        for i, term in enumerate(scheduler_data.terms):
-            self.stdout.write(f"Updating terms and groups -- {i}/{len(scheduler_data.terms)}", ending='\r')
-            self.stdout.flush()
-            if term.course is not None:
-                self.create_or_update_group_and_term(term)
-
-        if not dont_delete_terms_flag:
-            self.remove_unused_terms_groups()
+        self.update_terms(scheduler_data.terms, dont_delete_terms_flag)
         slack = Slack(secrets_env.str('SLACK_WEBHOOK_URL'))
         slack.prepare_message(self.summary)
         if write_to_slack_flag:
@@ -221,7 +239,6 @@ class Command(BaseCommand):
         self.api_config_url = f'{base}/scheduler/api/config/{config}/'
         task = options['api_task_url']
         self.api_task_url = f'{base}/scheduler/api/task/{task}/'
-        self.summary = Summary()
         dont_delete_terms_flag = options['dont_delete_terms']
         dry_run_flag = options['dry_run']
         write_to_slack_flag = options['slack']
@@ -232,12 +249,19 @@ class Command(BaseCommand):
         if dry_run_flag:
             self.stdout.write("Dry run is on. Nothing will be saved or deleted. All messages are informational.")
         try:
-            self.import_from_api(dont_delete_terms_flag, write_to_slack_flag, interactive_flag)
+            try:
+                self.import_from_api(dont_delete_terms_flag, write_to_slack_flag, interactive_flag)
+            except Exception:
+                if not interactive_flag:
+                    self.report_error()
+                raise
         except KeyboardInterrupt:
             self.stderr.write(self.style.ERROR("\nKeyboardInterrupt: Rolling back changes and exiting."))
             transaction.set_rollback(True)
         except SystemExit:
-            self.stderr.write(self.style.NOTICE("SystemExit: Commiting changes (unless --dry_run was on) and exiting."))
+            self.stderr.write(
+                self.style.NOTICE(
+                    "SystemExit: Committing changes (unless --dry_run was on) and exiting."))
             # Let the transaction finish gracefully.
             pass
         if dry_run_flag:
