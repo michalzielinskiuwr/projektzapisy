@@ -1,10 +1,12 @@
 import copy
 import json
+from collections import defaultdict
 from operator import attrgetter, itemgetter
 from datetime import datetime, timedelta
 from itertools import groupby
 from typing import Literal, NamedTuple, Optional, List, Dict, Set, Tuple
 
+from django.http.request import HttpRequest
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import ObjectDoesNotExist
@@ -30,12 +32,12 @@ from apps.users.models import Student, is_employee, is_student
 def calendar(request):
     rooms = Classroom.get_in_institute(reservation=True)
     new_rooms = [{"number": r.number,
-                  "floor": r.floor,
                   "capacity": r.capacity,
                   "type": r.get_type_display()} for r in rooms]
-    new_rooms = sorted(new_rooms, key=itemgetter('floor', 'number'))
-    return render(request, 'schedule/calendar.html', {"rooms": rooms,
-                                                      "new_rooms": new_rooms,
+    numeric = sorted([r for r in new_rooms if r["number"].isdigit()], key=lambda r: int(r["number"]))
+    alpha = sorted([r for r in new_rooms if not r["number"].isdigit()], key=itemgetter("number"))
+    numeric.extend(alpha)
+    return render(request, 'schedule/calendar.html', {"new_rooms": numeric,
                                                       "user_info": {
                                                           "full_name": request.user.get_full_name(),
                                                           "is_student": is_student(request.user),
@@ -43,38 +45,31 @@ def calendar(request):
                                                           "is_admin": request.user.has_perm('schedule.manage_events')}})
 
 
-def chosen_days_terms(request) -> JsonResponse:
+def chosen_days_terms(request: HttpRequest) -> JsonResponse:
     """Returns a mapping from room number to an array of time intervals when it is reserved."""
-    days = request.GET.get('days', [])
-    days = days.split(',') if isinstance(days, str) else days
-    if "" in days:
-        days.remove("")
+    day = request.GET.get('days')
     try:
-        for day in days:
-            day = datetime.strptime(day, '%Y-%m-%d')
+        day = datetime.strptime(day, '%Y-%m-%d')
     except ValueError:
         return HttpResponseBadRequest('Jedna z przesłanych dat jest złego formatu.')
-    
+
     # TODO Should we also display STATUS_PENDING events?
-    terms = Term.objects.filter(day__in=days, room__isnull=False, room__can_reserve=True,
+    terms = Term.objects.filter(day=day, room__isnull=False, room__can_reserve=True,
                                 event__status=Event.STATUS_ACCEPTED).select_related('room')
-    payload = {}
-    rooms = Classroom.get_in_institute(reservation=True)
-    for day in days:
-        day = str(day)
-        payload[day] = {}
-        for room in rooms:
-            payload[day][room.number] = []
+    payload = defaultdict(list)
     for term in terms:
-        payload[str(term.day)][term.room.number].append((term.start, term.end))
-    for day in days:
-        for room in rooms:
-            payload[day][room.number] = sorted(payload[day][room.number])
-    return JsonResponse(payload)
+        pr = payload[term.room.number]
+        if pr and pr[-1][1] > term.start:
+            # Last term overlaps with the current.
+            start, _ = pr.pop()
+            pr.append((start, term.end))
+        else:
+            pr.append((term.start, term.end))
+    return JsonResponse({k: [(s.isoformat(timespec='minutes'), e.isoformat(timespec='minutes')) for s, e in l]
+                         for k, l in payload.items()})
 
 
-def _check_and_prepare_get_data(request, require_dates: bool = True
-                                ) -> Dict[str, datetime or List[str] or str or int or bool]:
+def _check_and_prepare_get_data(request, require_dates: bool = True):
     """Parse GET query parameters to python objects.
 
     Args:
@@ -224,8 +219,8 @@ def _get_validated_terms(payload: Dict[str, str or List[Dict]], event: Event = N
     rooms_to_query = set()
     for payload_term in payload_terms:
         if 'rooms' in payload_term and payload_term['rooms']:
-            for room_number in payload_term['rooms']:
-                rooms_to_query.add(room_number)
+            for room in payload_term['rooms']:
+                rooms_to_query.add(room)
     rooms = {room.number: room for room in Classroom.objects.filter(number__in=rooms_to_query)}
     terms = []
     try:
@@ -235,10 +230,10 @@ def _get_validated_terms(payload: Dict[str, str or List[Dict]], event: Event = N
                         end=datetime.strptime(payload_term['end'], '%H:%M').time(),
                         day=datetime.strptime(payload_term['day'], '%Y-%m-%d').date())
             if 'rooms' in payload_term and payload_term['rooms']:
-                for room_number in payload_term['rooms']:
-                    term.room = rooms[room_number]
+                for number, ignore_conflicts in payload_term['rooms'].items():
+                    term.room = rooms[number]
                     term.place = None
-                    term.ignore_conflicts = any(r == room_number for r in payload_term['ignore_conflicts_rooms'])
+                    term.ignore_conflicts = ignore_conflicts
                     term.clean()
                     terms.append(term)
                     term = copy.deepcopy(term)
@@ -358,19 +353,16 @@ def _group_terms_same_date_and_time(terms: List[Term]) -> List[Dict]:
                     grouped_term["place"] = term.place
                     insert_to_grouped_terms = False
                     break
-                grouped_term["rooms"].append(term.room.number)
-                if term.ignore_conflicts:
-                    grouped_term["ignore_conflicts_rooms"].append(term.room.number)
+                grouped_term["rooms"][term.room.number] = term.ignore_conflicts
                 insert_to_grouped_terms = False
                 break
         if insert_to_grouped_terms:
-            grouped_terms.append({"start": term.start,
-                                  "end": term.end,
-                                  "day": term.day,
-                                  "rooms": [term.room.number] if term.room else [],
-                                  "ignore_conflicts_rooms": [
-                                      term.room.number] if term.room and term.ignore_conflicts else [],
-                                  "place": term.place})
+            grouped_terms.append({
+                "start": term.start,
+                "end": term.end,
+                "day": term.day,
+                "rooms": {term.room.number: term.ignore_conflicts} if term.room else {},
+                "place": term.place})
     return grouped_terms
 
 
