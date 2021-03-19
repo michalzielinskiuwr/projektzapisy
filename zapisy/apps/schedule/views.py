@@ -48,14 +48,19 @@ def calendar(request):
 def chosen_days_terms(request: HttpRequest) -> JsonResponse:
     """Returns a mapping from room number to an array of time intervals when it is reserved."""
     day = request.GET.get('days')
+    event = request.GET.get('event', None)
     try:
         day = datetime.strptime(day, '%Y-%m-%d')
     except ValueError:
         return HttpResponseBadRequest('Jedna z przesłanych dat jest złego formatu.')
 
     # TODO Should we also display STATUS_PENDING events?
-    terms = Term.objects.filter(day=day, room__isnull=False, room__can_reserve=True,
-                                event__status=Event.STATUS_ACCEPTED).select_related('room')
+    terms = Term.objects.filter(
+        day=day, room__isnull=False, room__can_reserve=True,
+        event__status=Event.STATUS_ACCEPTED
+    ).select_related('room')
+    if event is not None:
+        terms = terms.exclude(event__pk=event)
     payload = defaultdict(list)
     for term in terms:
         pr = payload[term.room.number]
@@ -384,7 +389,9 @@ def _get_event_info_to_send(event: Event, user: User) -> Dict[str, str or List[D
             "visible": event.visible,
             "created": event.created,
             "edited": event.edited,
-            "url": event.get_absolute_url()}
+            "url": event.get_absolute_url(),
+            "id": event.pk,
+            }
 
 
 @transaction.atomic

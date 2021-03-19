@@ -179,6 +179,7 @@ export default Vue.extend({
     termIndex: Number,
     canEdit: Boolean,
     allRooms: Array as PropType<RoomDescription[]>,
+    event: Number,
   },
   data() {
     return {
@@ -195,12 +196,14 @@ export default Vue.extend({
   },
   methods: {
     async getOtherReservations(day: string) {
-      // TODO pass event id in order to omit this event's term (if they exist)
       let url = new URL(
         "classrooms/chosen-days-terms/",
         window.location.origin
       );
       url.searchParams.append("days", day);
+      if (this.event != null) {
+        url.searchParams.append("event", this.event.toString());
+      }
       await axios
         .get(url.toString())
         .then(({ data }) => (this.otherReservations = data));

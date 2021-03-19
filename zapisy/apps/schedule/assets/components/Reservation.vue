@@ -143,6 +143,7 @@
                     v-bind:termIndex="index"
                     v-bind:canEdit="field_is_editable()"
                     v-bind:allRooms="options.rooms"
+                    v-bind:event="id"
                     v-on:removeTerm="removeTerm"
                   >
                   </TermSelection>
@@ -265,6 +266,7 @@ export default {
       show_alert: false,
       error_message: "",
 
+      id : null,
       url: "",
       user_info: {
         full_name: "",
@@ -380,6 +382,7 @@ export default {
         this.status = event.data.status;
         this.visible = event.data.visible;
         this.url = event.data.url;
+        this.id = event.data.id;
 
         for (let term of event.data.terms) {
           // We need to get rid of seconds to send data properly (expected format
