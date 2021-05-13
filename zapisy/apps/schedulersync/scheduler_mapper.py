@@ -8,14 +8,24 @@ then user will be asked for proper input.
 Fills summary object given in constructor.
 
 """
-from typing import Dict, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Optional, Set
 
 from apps.enrollment.courses.models import CourseInstance
+from apps.enrollment.courses.models.classroom import Classroom
 from apps.offer.proposal.models import Proposal, ProposalStatus
 from apps.schedulersync.models import CourseMap, EmployeeMap
 from apps.users.models import Employee
 
-from .scheduler_data import SchedulerData, SZTerm
+from .scheduler_data import SchedulerData, SchTerm
+
+
+@dataclass
+class SZTerm(SchTerm):
+    """SchTerm with teacher, course, and classrooms identified in DB."""
+    teacher: Optional[Employee]
+    course: Optional[CourseInstance]
+    classrooms: List[Classroom]
 
 
 class SchedulerMapper:
@@ -163,6 +173,14 @@ class SchedulerMapper:
                 mapped_courses[course] = get_course(proposal)
         return mapped_courses
 
+    def _map_classrooms(self, rooms: Iterable[str]) -> Dict[str, Classroom]:
+        """Maps classroom numbers to Zapisy Clasroom objects.
+
+        Room numbers absent in the database will be ignored.
+        """
+        classrooms = Classroom.objects.filter(number__in=rooms)
+        return {r.number: r for r in classrooms}
+
     def map_scheduler_data(self, scheduler_data: 'SchedulerData'):
         """Maps teachers and courses in given scheduler_data.
 
@@ -173,12 +191,17 @@ class SchedulerMapper:
         Args:
             Data from scheduler api, obtained by SchedulerData object.
         """
-        scheduler_data.teachers = self._map_teachers(scheduler_data.teachers)
-        scheduler_data.courses = self._map_courses(scheduler_data.courses)
-        mapped_terms = []
+        teachers_map = self._map_teachers(scheduler_data.teachers)
+        courses_map = self._map_courses(scheduler_data.courses)
+        classrooms_map = self._map_classrooms(scheduler_data.classrooms)
+        mapped_terms: List[SZTerm] = []
         for term in scheduler_data.terms:
-            course = scheduler_data.courses[term.course]
-            teacher = scheduler_data.teachers[term.teacher]
+            course = courses_map[term.course]
+            teacher = teachers_map[term.teacher]
+            classrooms = [
+                classrooms_map[number]
+                for number in term.classrooms if number in classrooms_map
+            ]
             mapped_terms.append(SZTerm(term.scheduler_id, teacher, course, term.type, term.limit,
-                                       term.dayOfWeek, term.start_time, term.end_time, term.classrooms))
+                                       term.dayOfWeek, term.start_time, term.end_time, classrooms))
         scheduler_data.terms = mapped_terms

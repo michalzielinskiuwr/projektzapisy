@@ -1,12 +1,11 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Column, Div, Layout, Row, Submit
+from crispy_forms.layout import Column, Layout, Row, Submit
 from django import forms
 from django.utils import timezone
 
 from apps.common import widgets as common_widgets
 from apps.theses.enums import ThesisKind, ThesisStatus, ThesisVote
 from apps.theses.models import MAX_ASSIGNED_STUDENTS, MAX_THESIS_TITLE_LEN, Remark, Thesis, Vote
-from apps.theses.system_settings import change_status
 from apps.users.models import Employee, Student
 
 
@@ -41,10 +40,13 @@ class ThesisFormBase(forms.ModelForm):
                                                 label="Promotor wspierający",
                                                 required=False)
     kind = forms.ChoiceField(choices=ThesisKind.choices, label="Typ")
-    students = forms.ModelMultipleChoiceField(queryset=Student.objects.all(),
-                                              required=False,
-                                              label="Przypisani studenci",
-                                              widget=forms.SelectMultiple(attrs={'size': '10'}))
+    students = forms.ModelMultipleChoiceField(
+        queryset=Student.objects.all(),
+        required=False,
+        label="Przypisani studenci",
+        help_text=(f"Limit przypisanych studentów: {MAX_ASSIGNED_STUDENTS}. "
+                   "Aby przypisać więcej studentów należy zwrócić się do zastępcy dyrektora ds. dydaktycznych."),
+        widget=forms.SelectMultiple(attrs={'size': '10'}))
     status = forms.ChoiceField(choices=ThesisStatus.choices, label="Status")
     reserved_until = forms.DateField(widget=forms.TextInput(attrs={'type': 'date'}),
                                      label="Zarezerwowana do",
@@ -63,6 +65,9 @@ class ThesisFormBase(forms.ModelForm):
                 pk=user.employee.pk)
             self.fields['advisor'].initial = user.employee
             self.fields['advisor'].widget.attrs['readonly'] = True
+
+        self.can_assign_multiple_students = user.has_perm('theses.assign_multiple_students')
+
         self.fields['supporting_advisor'].queryset = Employee.objects.exclude(
             pk=user.employee.pk)
         self.helper = FormHelper()
@@ -70,9 +75,8 @@ class ThesisFormBase(forms.ModelForm):
 
     def clean_students(self):
         students = self.cleaned_data['students']
-        if len(students) > MAX_ASSIGNED_STUDENTS:
-            raise forms.ValidationError(
-                "Możesz przypisać maksymalnie " + str(MAX_ASSIGNED_STUDENTS) + " studentów")
+        if 'students' in self.changed_data and len(students) > MAX_ASSIGNED_STUDENTS:
+            raise forms.ValidationError('Przekroczono limit przypisanych studentów.')
         return students
 
 
@@ -102,11 +106,7 @@ class ThesisForm(ThesisFormBase):
                 Column('supporting_advisor', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'),
             row_1,
-            Div('students',
-                HTML(('<small class="form-text text-muted ">Przytrzymaj '
-                      'wciśnięty klawisz „Ctrl” lub „Command” na Macu, aby '
-                      'zaznaczyć więcej niż jeden wybór.</small>')),
-                css_class='mb-3'),
+            'students',
             'description',
         )
 
@@ -153,11 +153,7 @@ class EditThesisForm(ThesisFormBase):
                 Column('supporting_advisor', css_class='form-group col-md-6 mb-0'),
                 css_class='form-row'),
             special_row,
-            Div('students',
-                HTML(('<small class="form-text text-muted ">Przytrzymaj '
-                      'wciśnięty klawisz „Ctrl” lub „Command” na Macu, aby '
-                      'zaznaczyć więcej niż jeden wybór.</small>')),
-                css_class='mb-3'),
+            'students',
             'description',
         )
         if self.instance.is_returned and self.instance.is_mine(user):
@@ -273,14 +269,8 @@ class VoteForm(forms.ModelForm):
             instance.owner = self.user.employee
         if getattr(instance, 'thesis', None) is None:
             instance.thesis = self.thesis
-        thesis = instance.thesis
-
-        # check number of votes and change thesis status
-        change_status(thesis, instance.vote)
-
         if commit:
             instance.save()
-
         return instance
 
 

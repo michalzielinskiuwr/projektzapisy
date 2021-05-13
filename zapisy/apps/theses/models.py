@@ -11,7 +11,7 @@ from apps.users.models import Employee, Student
 
 MAX_THESIS_TITLE_LEN = 300
 MAX_REJECTION_REASON_LENGTH = 500
-MAX_ASSIGNED_STUDENTS = 2
+MAX_ASSIGNED_STUDENTS = 1
 
 
 class ThesesSystemSettings(models.Model):
