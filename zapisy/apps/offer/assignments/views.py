@@ -25,8 +25,7 @@ from .sheets import (create_sheets_service, read_assignments_sheet,
                      update_employees_sheet, update_assignments_sheet,
                      update_voting_results_sheet)
 from .utils import (AssignmentsCourseInfo, AssignmentsViewSummary, CourseGroupTypeSummary,
-                    EmployeeData, TeacherInfo, get_last_years, get_votes,
-                    suggest_teachers)
+                    EmployeeData, ProcessedAssignment, TeacherInfo, get_last_years, get_votes, suggest_teachers)
 
 env = environ.Env()
 environ.Env.read_env(os.path.join(settings.BASE_DIR, os.pardir, 'env', '.env'))
@@ -65,20 +64,24 @@ def plan_view(request):
         assignments_course_info: AssignmentsCourseInfo = courses[semester][name]
         if group_type not in assignments_course_info:
             assignments_course_info[group_type] = CourseGroupTypeSummary(
-                hours=assignment.hours_semester, teachers=set())
+                hours=assignment.hours_semester, teachers={})
         if assignment.teacher_username not in teachers:
             messages.warning(
                 request, f"Użytkownik <strong>{assignment.teacher_username}</strong> "
                 "nie występuje w arkuszu <em>Pracownicy</em>. Przydział został pominięty.")
             continue
         teacher = teachers[assignment.teacher_username]
-        assignments_course_info[group_type].teachers.add(
-            TeacherInfo(username=assignment.teacher_username,
-                        name=f"{teacher.first_name} {teacher.last_name}"))
+        teacher_info = TeacherInfo(username=assignment.teacher_username,
+                                   name=f"{teacher.first_name} {teacher.last_name}")
+        # We do not use a defaultdict or Counter because they conflict with django templates,
+        # see https://docs.djangoproject.com/en/3.2/ref/templates/language/#template-variables
+        count = assignments_course_info[group_type].teachers.get(teacher_info, 0)
+        assignments_course_info[group_type].teachers[teacher_info] = count + 1
+        processed_assignment = ProcessedAssignment(assignment)
+        stats[semester][group_type] += processed_assignment.hours_to_pensum
+        hours_global[semester] += processed_assignment.hours_to_pensum
         key = 'courses_winter' if assignment.semester == 'z' else 'courses_summer'
-        getattr(teacher, key).append(assignment)
-        stats[semester][group_type] += assignment.hours_semester / assignment.multiple_teachers
-        hours_global[semester] += assignment.hours_semester / assignment.multiple_teachers
+        getattr(teacher, key).append(processed_assignment)
 
     context = {
         'year': year,
