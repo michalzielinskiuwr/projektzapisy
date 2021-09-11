@@ -1,5 +1,5 @@
 templates/
 compiled_assets/
-schedule/assets/components/*
+apps/schedule/assets/components/*
 .yarn/*
 .pnp*
