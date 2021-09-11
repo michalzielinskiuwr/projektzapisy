@@ -80,13 +80,13 @@ class Event(models.Model):
             if not any(self.type == t for t, _ in Event.TYPES_FOR_STUDENT):
                 raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu', code='permission')
             if self.status != Event.STATUS_PENDING:
-                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia 1', code='permission')
+                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia', code='permission')
         # Employee can create accepted exam and test events
         if self.author.employee:
             if not any(self.type == t for t, _ in Event.TYPES_FOR_TEACHER):
                 raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu', code='permission')
             if self.type == Event.TYPE_GENERIC and self.status != Event.STATUS_PENDING:
-                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia 2', code='permission')
+                raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia', code='permission')
 
     def clean(self, *args, **kwargs):
         """Overload clean method.
@@ -123,7 +123,7 @@ class Event(models.Model):
                 if self.status != Event.STATUS_PENDING:
                     raise ValidationError(
                         message={
-                            'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia 3']},
+                            'status': ['Nie masz uprawnień aby dodawać zaakceptowane wydarzenia']},
                         code='permission')
 
         else:

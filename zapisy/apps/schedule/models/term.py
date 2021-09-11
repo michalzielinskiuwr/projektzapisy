@@ -119,7 +119,7 @@ class Term(models.Model):
     def get_conflicted_except_given_terms(self, except_terms):
         conflict_terms = list(self.get_conflicted())
         if not conflict_terms:
-            return conflict_terms
+            return list()
         for except_term in except_terms:
             if except_term in conflict_terms:
                 conflict_terms.remove(except_term)

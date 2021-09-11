@@ -472,10 +472,8 @@ def update_event(request, event_id: int) -> JsonResponse:
         conflicts = _send_conflicts(conflicts, status=400)
         transaction.set_rollback(True)
         return conflicts
-    for present_term in present_terms:
-        present_term.delete()
-    for new_term in new_terms:
-        new_term.save()
+    present_terms.delete()
+    Term.objects.bulk_create(new_terms)
     return JsonResponse(_get_event_info_to_send(event, request.user), status=201)
 
 

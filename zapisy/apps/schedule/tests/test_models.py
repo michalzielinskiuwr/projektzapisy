@@ -34,16 +34,6 @@ class TermTestCase(TestCase):
         termsoftheday = EventTerm.get_terms_for_dates([term2.get_day()], term2.get_room())
         self.assertEqual(len(termsoftheday), 1)
 
-    def test_validation_on_overlapping(self):
-        term2 = factories.TermFactory()
-        term2.full_clean()
-        term2.save()
-        term3 = factories.TermFactory(
-            room=term2.get_room(),
-            day=term2.get_day()
-        )
-        self.assertRaises(ValidationError, term3.full_clean)
-
 
 class EventTestCase(TestCase):
     def setUp(self):
@@ -96,14 +86,14 @@ class EventTestCase(TestCase):
         event = factories.EventCourseFactory.create()
         self.assertEqual(event.get_absolute_url(), '/courses/group/%s' % event.group_id)
 
-    def test_clean__overlapping_term(self):
+    def test_clean__invalid_term(self):
         event = Event.objects.all()[0]
         room110 = Classroom.get_by_number('110')
         term = EventTerm(
             event=event,
             day=date(2016, 5, 20),
             start=time(15),
-            end=time(16),
+            end=time(15),
             room=room110
         )
         self.assertRaises(ValidationError, term.full_clean)
@@ -174,7 +164,7 @@ class EventTestCase(TestCase):
         permission = Permission.objects.get(codename='manage_events')
         user.user_permissions.add(permission)
         event = factories.EventFactory(visible=False)
-        self.assertTrue(event.get_event_or_404(0,user))
+        self.assertTrue(event.get_event_or_404(event.pk,user))
 
     def test_student_cant_see_pending_event(self):
         user = UserFactory()
@@ -192,6 +182,9 @@ class EventTestCase(TestCase):
         user = UserFactory()
         user.full_clean()
         event = factories.EventFactory.build(type=Event.TYPE_CLASS)
+        #print("TEST CASE STARTED : ")
+        #print("has_perm: ", user.has_perm('schedule.manage_events'), " autor: ", user, ", event: ", event.author, "status: ", event.status, "visible: ", event.visible)
+        event.visible = False
         self.assertFalse(event.can_user_see(user))
 
     def test_user_cant_see_type_other_event(self):
