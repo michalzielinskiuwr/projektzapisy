@@ -5,12 +5,10 @@ from django.contrib.auth.models import Permission
 from django.core.validators import ValidationError
 from django.http import Http404
 from django.test import TestCase
-from django.utils.crypto import get_random_string
 
 import apps.enrollment.courses.tests.factories as enrollment_factories
 from apps.enrollment.courses.models.classroom import Classroom
 from apps.enrollment.courses.models.semester import Semester
-from apps.enrollment.courses.tests.objectmothers import ClassroomObjectMother, SemesterObjectMother
 from apps.enrollment.records.models import Record, RecordStatus
 from apps.schedule.models.event import Event
 from apps.schedule.models.term import Term as EventTerm
@@ -164,7 +162,7 @@ class EventTestCase(TestCase):
         permission = Permission.objects.get(codename='manage_events')
         user.user_permissions.add(permission)
         event = factories.EventFactory(visible=False)
-        self.assertTrue(event.get_event_or_404(event.pk,user))
+        self.assertTrue(event.get_event_or_404(event.pk, user))
 
     def test_student_cant_see_pending_event(self):
         user = UserFactory()
@@ -182,8 +180,6 @@ class EventTestCase(TestCase):
         user = UserFactory()
         user.full_clean()
         event = factories.EventFactory.build(type=Event.TYPE_CLASS)
-        #print("TEST CASE STARTED : ")
-        #print("has_perm: ", user.has_perm('schedule.manage_events'), " autor: ", user, ", event: ", event.author, "status: ", event.status, "visible: ", event.visible)
         event.visible = False
         self.assertFalse(event.can_user_see(user))
 

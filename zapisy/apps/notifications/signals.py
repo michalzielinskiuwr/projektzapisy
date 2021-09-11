@@ -181,7 +181,7 @@ def notify_board_members_about_voting(sender: Thesis, **kwargs) -> None:
 @receiver(terms_conflict, sender=Event)
 def notify_that_terms_conflict_appear(sender: Record, **kwargs) -> None:
     event = kwargs['instance']
-    target = reverse(course_view, args=[event.course.slug]) #?
+    target = reverse(course_view, args=[event.course.slug])
 
     notify_user(
         kwargs['user'],

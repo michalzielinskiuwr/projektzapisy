@@ -124,6 +124,7 @@ class DesiderataOtherSerializer(serializers.ModelSerializer):
         model = DesiderataOther
         fields = '__all__'
 
+
 class SingleVoteSerializer(serializers.ModelSerializer):
     """Serializes single student vote.
 

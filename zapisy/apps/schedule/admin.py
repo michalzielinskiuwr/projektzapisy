@@ -1,4 +1,3 @@
-from django import forms
 from django.contrib import admin
 
 from .models.term import Term
@@ -10,10 +9,12 @@ class EventAdmin(admin.ModelAdmin):
     list_filter = ('type',)
     ordering = ('type', 'title')
 
+
     def save_model(self, request, obj, form, change):
         instance = form.save(commit=False)
         instance.save(author_id=request.user.id)
         return instance
+
 
 class TermAdmin(admin.ModelAdmin):
     list_display = ('event', 'day', 'start', 'end', 'room', 'place')

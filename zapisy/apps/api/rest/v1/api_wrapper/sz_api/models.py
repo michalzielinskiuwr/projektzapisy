@@ -142,6 +142,7 @@ class DesiderataOther(Model):
     def __init__(self, id, comment, employee, semester):
         pass
 
+
 class SystemState(Model):
     redirect_key = "systemstate"
     is_paginated = False

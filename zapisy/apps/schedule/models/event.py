@@ -10,7 +10,7 @@ from apps.enrollment.courses.models.course_instance import CourseInstance
 from apps.enrollment.courses.models.group import Group
 from apps.enrollment.records.models import Record, RecordStatus
 from apps.enrollment.courses.models.semester import Semester
-from apps.notifications.custom_signals import terms_conflict
+from .term import Term
 
 class Event(models.Model):
     TYPE_EXAM = '0'
@@ -56,12 +56,14 @@ class Event(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     edited = models.DateTimeField(auto_now=True)
 
+
     def get_absolute_url(self):
         from django.urls import reverse
 
         if self.group:
             return reverse('group-view', args=[str(self.group_id)])
         return reverse('schedule:event', args=[str(self.pk)])
+
 
     class Meta:
         app_label = 'schedule'
@@ -71,6 +73,7 @@ class Event(models.Model):
         permissions = (
             ("manage_events", "Może zarządzać wydarzeniami"),
         )
+
 
     def _authorize_user_can_create_update_event(self):
         """ Check if author is authorized to set given Event properties """
@@ -87,6 +90,7 @@ class Event(models.Model):
                 raise ValidationError('Nie masz uprawnień aby dodawać wydarzenia tego typu', code='permission')
             if self.type == Event.TYPE_GENERIC and self.status != Event.STATUS_PENDING:
                 raise ValidationError('Nie masz uprawnień aby dodawać zaakceptowane wydarzenia', code='permission')
+
 
     def clean(self, *args, **kwargs):
         """Overload clean method.
@@ -134,20 +138,20 @@ class Event(models.Model):
 
                 # if status changes to accepted, validate all term objects
                 if self.status == Event.STATUS_ACCEPTED:
-                    from .term import Term
                     for term in Term.objects.filter(event=self):
                         term.clean()
             self._authorize_user_can_create_update_event()
 
         super(Event, self).clean()
 
+
     def remove(self):
         """Removing all terms bounded with given event."""
-        from .term import Term
         terms = Term.objects.filter(event=self)
         for term in terms:
             term.delete()
         self.delete()
+
 
     def get_conflicted(self) -> List['Term']:
         """Returns all conflicting terms."""
@@ -158,6 +162,7 @@ class Event(models.Model):
             for conflict in term_conflicts:
                 event_conflicts.add(conflict)
         return list(event_conflicts)
+
 
     def can_user_see(self, user):
         """Return True if user can see event, otherwise False.
@@ -173,6 +178,7 @@ class Event(models.Model):
                 return False
 
         return True
+
 
     @classmethod
     def get_event_or_404(cls, id, user):
@@ -192,6 +198,7 @@ class Event(models.Model):
             return event
         else:
             raise Http404
+
 
     @classmethod
     def get_event_for_moderation_or_404(cls, id, user):
@@ -214,6 +221,7 @@ class Event(models.Model):
         else:
             raise Http404
 
+
     @classmethod
     def get_event_for_moderation_only_or_404(cls, id, user):
         """If events exist and user can send moderation message - return it.
@@ -235,6 +243,7 @@ class Event(models.Model):
         else:
             raise Http404
 
+
     @classmethod
     def get_all(cls):
         """Return all events with all needed select_related and prefetch_related.
@@ -244,6 +253,7 @@ class Event(models.Model):
         return cls.objects.all().select_related('group', 'course', 'author') \
             .prefetch_related('term_set', 'term_set__room')
 
+
     @classmethod
     def get_all_without_courses(cls):
         """Return all events with all needed select_related and prefetch_related.
@@ -251,6 +261,7 @@ class Event(models.Model):
         @return: Event QuerySet
         """
         return cls.get_all().exclude(type=Event.TYPE_CLASS)
+
 
     @classmethod
     def get_for_user(cls, user):
@@ -262,6 +273,7 @@ class Event(models.Model):
         return cls.objects.filter(author=user).select_related('course', 'author')\
             .prefetch_related('term_set')
 
+
     @classmethod
     def get_exams(cls):
         """Return list of all exams.
@@ -271,6 +283,7 @@ class Event(models.Model):
         return cls.objects.filter(type=Event.TYPE_EXAM, status=Event.STATUS_ACCEPTED)\
             .order_by('-created').select_related('course')
 
+
     def get_followers(self):
         if self.type in [Event.TYPE_EXAM, Event.TYPE_TEST]:
             emails = Record.objects.filter(group__course=self.course,
@@ -279,6 +292,7 @@ class Event(models.Model):
             return emails
 
         return self.interested.values_list('email', flat=True)
+
 
     def __str__(self):
         return '%s %s' % (self.title, self.description)
