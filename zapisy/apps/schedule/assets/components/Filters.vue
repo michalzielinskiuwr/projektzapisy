@@ -7,7 +7,7 @@
           <label>Wybierz sale:</label>
           <select class="custom-select" size="6" v-model="rooms" title="Wybierz sale" multiple>
             <option value="all">Wszystkie</option>
-            <option v-for="room in options.rooms" :value="room.number">
+            <option v-for="room in options.rooms" :value="room.number" :key="room">
               {{ room.number }} ({{ room.capacity }} miejsc, {{ room.type }})
             </option>
           </select>
@@ -20,7 +20,7 @@
           </div>
 
           <label>Typ wydarzenia:</label> <br>
-          <div class="form-check form-check-inline" v-for="(type, index) in options.type">
+          <div class="form-check form-check-inline" v-for="(type, index) in options.type" :key="(type, index)">
             <input v-model="types" class="form-check-input" type="checkbox"
                    :value="type.value" :id="'type' + index">
             <label class="form-check-label filter-box"
@@ -32,7 +32,7 @@
       <div class="row" v-if="user_info.is_admin">
         <div class="col-md-12" style="margin-top: 10px">
           <label>Status wydarzenia:</label>
-          <div class="form-check form-check-inline" v-for="status in options.status">
+          <div class="form-check form-check-inline" v-for="status in options.status" :key="status">
             <input v-model="statuses" class="form-check-input" type="checkbox" :value="status.value">
             <label class="form-check-label">{{ status.text }}</label>
           </div>
