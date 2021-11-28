@@ -1,20 +1,39 @@
-{% extends "base.html" %}
-{% load render_bundle from webpack_loader %}
+{% extends "defectBase.html" %}
 
 {% load crispy_forms_tags %}
 
-{% block main-subtitle %}System raportowania usterek{% endblock %}
-
 {% block all-content %}
     <div class="d-flex justify-content-between align-items-center">
-    <h1 class="d-inline-block">
-        Usterki
-    </h1>
-	<a href="{% url 'defects:new' %}" class="btn btn-primary" role="button">Dodaj nową usterkę</a>
+        <h1 class="d-inline-block">
+            Usterki
+        </h1>
+        <a href="{% url 'defects:new' %}" class="btn btn-primary" role="button">Dodaj nową usterkę</a>
+    </div>
 
-</div>
+    <table class="table table-striped sortable">
+        <thead>
+        <tr>
+            <th scope="col" class="az" data-defaultsign="nospan" data-defaultsort="asc">Nazwa Usterki</th>
+            <th scope="col" class="text-center">Miejsce usterki</th>
+            <th scope="col" class="text-center">Data zgłoszenia</th>
+            <th scope="col" class="text-center">Data modyfikacji</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for defect in defects %}
+            <tr>
+                <td><a href={{ defect.get_url }} </a>{{ defect.name }} </a> </td>
+                <td class="text-center">{{ defect.place }}</td>
+                <td class="text-center">{{ defect.creation_date }}</td>
+                <td class="text-center">{{ defect.last_modification }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
 
-<div id="defect-root">
+    </div>
 
-</div>
+    <div id="defect-root">
+
+    </div>
 {% endblock %}

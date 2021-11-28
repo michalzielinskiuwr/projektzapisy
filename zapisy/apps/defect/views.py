@@ -9,7 +9,7 @@ from .models import Defect
 
 
 def index(request):
-    return render(request, 'defectMain.html', {})  # TODO make this to be the list
+    return render(request, 'defectMain.html', {'defects': Defect.objects.all()})
 
 
 # @employee_required
@@ -38,3 +38,7 @@ def add_defect(request):
         form = DefectForm()
     context = {'form': form, "response": request.method}
     return render(request, 'addDefect.html', context)
+
+
+def show_defect(request, id):
+    return render(request, 'showDefect.html', {'id': id})

@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.utils.timezone import now
+from django.urls import reverse
 
 DEFECT_MAX_NAME_SIZE = 255
 DEFECT_MAX_PLACE_SIZE = 255
@@ -21,3 +21,6 @@ class Defect(models.Model):
     description = models.TextField("Opis usterki", blank=True)
     reporter = models.ForeignKey(User, on_delete=models.CASCADE)
     state = models.PositiveSmallIntegerField("Stan", choices=StateChoices.choices, default=StateChoices.CREATED)
+
+    def get_url(self):
+        return reverse('defects:show_defect', args=[str(self.id)])
