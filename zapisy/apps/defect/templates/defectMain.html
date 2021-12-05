@@ -22,7 +22,7 @@
         <tbody>
         {% for defect in defects %}
             <tr>
-                <td><a href={{ defect.get_url }} </a>{{ defect.name }} </a> </td>
+                <td><a href= {% url "defects:show_defect" defect.id %} </a>{{ defect.name }} </a> </td>
                 <td class="text-center">{{ defect.place }}</td>
                 <td class="text-center">{{ defect.creation_date }}</td>
                 <td class="text-center">{{ defect.last_modification }}</td>
