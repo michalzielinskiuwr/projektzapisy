@@ -403,3 +403,11 @@ REST_FRAMEWORK = {
     # specifying `filterset_fields` in a view
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
 }
+
+#
+# Google Drive Storage Settings
+#
+
+GOOGLE_DRIVE_STORAGE_JSON_KEY_FILE = 'projekt-zapisy-development-4f5dfc9a23fa.json'
+GOOGLE_DRIVE_STORAGE_MEDIA_ROOT = '/zapisy'  # OPTIONAL
+

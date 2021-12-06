@@ -13,8 +13,9 @@
             {% endif %}
         </h1>
     </div>
-    <form method="POST" class="post-form">
+    <form method="POST" class="post-form" enctype="multipart/form-data">
         {% csrf_token %}
+        <input type="file" name="upload_photo" accept="image/*">
         {% crispy form %}
     </form>
 </div>

@@ -1,12 +1,21 @@
 import json
 
 from django.contrib import messages
+from django.db import transaction
 from django.shortcuts import render, redirect
+from django.urls import reverse_lazy
 from django.utils.timezone import now
+from django.views.generic import CreateView
 
-from .forms import DefectForm
+from .forms import DefectForm, ImageForm, Image
 from .models import Defect, StateChoices
+
 from ..users.decorators import employee_required
+
+from gdstorage.storage import GoogleDriveStorage
+
+# Define Google Drive Storage
+gd_storage = GoogleDriveStorage()
 
 
 @employee_required
@@ -98,3 +107,42 @@ def handle_post_request(request, if_edit=False, defect_id=None):
         messages.error(request, str(form.errors))
         context = {'form': form, "response": request.method, "edit":if_edit}
         return render(request, 'addDefect.html', context)
+
+
+""" class DefectImageCreate(CreateView):
+    model = Defect
+    fields = ["name", "place", "description", "state"]
+    success_url = reverse_lazy('create')
+
+    def get_context_data(self, **kwargs):
+        data = super(DefectImageCreate, self).get_context_data(**kwargs)
+        if self.request.POST:
+            data['photos'] = ImageFormSet(self.request.POST)
+        else:
+            data['photos'] = ImageFormSet()
+        return data
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        photos = context['photos']
+        with transaction.atomic():
+            self.object = form.save()
+
+            if photos.is_valid():
+                photos.instance = self.object
+                photos.save()
+        return super(DefectImageCreate, self).form_valid(form)
+=#"""
+
+
+def add_image(request):
+    if request.method == "POST":
+        image_form = ImageForm(request.POST, request.FILES)
+        if image_form.is_valid():
+            image_form.save()
+        return redirect('defects:image')
+
+    image_form = ImageForm()
+    photos = Image.objects.all()
+    return render(request=request, template_name="addImage.html",
+                  context={'form': image_form, 'photos': photos})
