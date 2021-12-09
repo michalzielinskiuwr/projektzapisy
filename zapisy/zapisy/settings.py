@@ -214,7 +214,6 @@ INSTALLED_APPS = (
 
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'mailer',
     'apps.enrollment.courses',
     'apps.enrollment.records',
     'apps.enrollment.timetable',
