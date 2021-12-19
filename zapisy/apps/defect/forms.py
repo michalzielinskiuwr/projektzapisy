@@ -27,6 +27,7 @@ class DefectForm(DefectFormBase):
         super(DefectForm, self).__init__(*args, **kwargs)
 
 
+# TODO change image to not required
 class ImageForm(forms.ModelForm):
 
     class Meta:
@@ -41,4 +42,10 @@ class ImageForm(forms.ModelForm):
             Submit('submit', 'Zapisz', css_class='btn-primary'))
 
 
-# ImageFormSet = inlineformset_factory(Defect, Image, form=ImageForm, extra=1)
+ExtraImagesNumber = 10
+DefectImageFormSet = inlineformset_factory(Defect,
+                                           Image,
+                                           form=ImageForm,
+                                           extra=ExtraImagesNumber,
+                                           can_delete=True)
+

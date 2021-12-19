@@ -7,8 +7,10 @@ from django.urls import reverse_lazy
 from django.utils.timezone import now
 from django.views.generic import CreateView
 
-from .forms import DefectForm, ImageForm, Image
 from .models import Defect, StateChoices
+
+from .forms import DefectForm, ImageForm, Image, DefectImageFormSet, ExtraImagesNumber
+
 
 from ..users.decorators import employee_required
 
@@ -56,6 +58,40 @@ def add_defect(request):
         form = DefectForm()
     context = {'form': form, "response": request.method}
     return render(request, 'addDefect.html', context)
+
+
+def new_defect(request):
+    if request.method == "POST":
+        form = DefectForm(request.POST, request.FILES)
+        formset = DefectImageFormSet(request.POST, request.FILES)
+        if form.is_valid():
+            defect = form.save(commit=False)
+            formset = DefectImageFormSet(request.POST, request.FILES, instance=defect)
+
+            if formset.is_valid():
+                defect.save()
+                formset.save()
+
+                return redirect(defect)
+    else:
+        form = DefectForm()
+        formset = DefectImageFormSet()
+    return render(request,
+                  'createDefectWithImages.html',
+                  {'form': form, 'formset': formset, 'extra_images_number': ExtraImagesNumber})
+
+
+def add_image(request):
+    if request.method == "POST":
+        image_form = ImageForm(request.POST, request.FILES)
+        if image_form.is_valid():
+            image_form.save()
+        return redirect('defects:image')
+
+    image_form = ImageForm()
+    photos = Image.objects.all()
+    return render(request=request, template_name="addImage.html",
+                  context={'form': image_form, 'photos': photos})
 
 
 @employee_required
@@ -109,40 +145,3 @@ def handle_post_request(request, if_edit=False, defect_id=None):
         return render(request, 'addDefect.html', context)
 
 
-""" class DefectImageCreate(CreateView):
-    model = Defect
-    fields = ["name", "place", "description", "state"]
-    success_url = reverse_lazy('create')
-
-    def get_context_data(self, **kwargs):
-        data = super(DefectImageCreate, self).get_context_data(**kwargs)
-        if self.request.POST:
-            data['photos'] = ImageFormSet(self.request.POST)
-        else:
-            data['photos'] = ImageFormSet()
-        return data
-
-    def form_valid(self, form):
-        context = self.get_context_data()
-        photos = context['photos']
-        with transaction.atomic():
-            self.object = form.save()
-
-            if photos.is_valid():
-                photos.instance = self.object
-                photos.save()
-        return super(DefectImageCreate, self).form_valid(form)
-=#"""
-
-
-def add_image(request):
-    if request.method == "POST":
-        image_form = ImageForm(request.POST, request.FILES)
-        if image_form.is_valid():
-            image_form.save()
-        return redirect('defects:image')
-
-    image_form = ImageForm()
-    photos = Image.objects.all()
-    return render(request=request, template_name="addImage.html",
-                  context={'form': image_form, 'photos': photos})
