@@ -1,17 +1,41 @@
-import logging
+import json
 
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.utils.timezone import now
 
 from .forms import DefectForm
-from .models import Defect
+from .models import Defect, StateChoices
 from ..users.decorators import employee_required
 
 
 @employee_required
 def index(request):
+    if request.method == "POST":
+        query = request.POST
+        defects_list = parse_names(request)
+        if defects_list is None or len(defects_list) == 0:
+            messages.error(request, "Akcja wymaga zaznaczenia elementów")
+        elif query.get('print') is not None:
+            messages.info(request, "Metoda nie zaimplementowana.")
+        elif query.get('done') is not None:
+            Defect.objects.filter(pk__in=defects_list).update(state=StateChoices.DONE)
+        elif query.get('delete') is not None:
+            to_delete = Defect.objects.filter(pk__in=defects_list)
+            query_set = ", ".join(map(lambda x: x['name'], list(to_delete.values())))
+            messages.info(request, "Usunięto następujące usterki: " + query_set)
+            to_delete.delete()
+        else:
+            messages.error(request, "Nie wprowadzono metody. Ten błąd nie powinien się zdarzyć. Proszę o kontakt z "
+                           "administratorem systemu zapisów.")
     return render(request, 'defectMain.html', {'defects': Defect.objects.all()})
+
+
+def parse_names(request):
+    try:
+        return list(map(int, request.POST.getlist("names[]")))
+    except Exception:
+        return None
 
 
 @employee_required
@@ -62,12 +86,13 @@ def handle_post_request(request, if_edit=False, defect_id=None):
         if if_edit:
             Defect.objects.filter(pk=defect_id).update(name=form_data['name'], last_modification=creation_date,
                             description=form_data['description'], state=form_data['state'], place=form_data['place'])
+            messages.success(request, "Edytowano usterkę")
         else:
             defect = Defect(name=form_data['name'], creation_date=creation_date, last_modification=creation_date,
                             place=form_data['place'], description=form_data['description'], reporter=request.user,
                             state=form_data['state'])
             defect.save()
-        messages.success(request, "Dodano pomyślnie usterkę")
+            messages.success(request, "Dodano usterkę")
         return redirect('defects:main')
     else:
         messages.error(request, str(form.errors))

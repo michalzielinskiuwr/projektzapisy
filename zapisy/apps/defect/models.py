@@ -24,3 +24,8 @@ class Defect(models.Model):
 
     def get_url(self):
         return reverse('defects:show_defect', args=[str(self.id)])
+
+    def get_status_color(self):
+        color = {StateChoices.CREATED: None, StateChoices.IMPOSSIBLE: "red", StateChoices.LONGER_ISSUE: "red",
+                 StateChoices.DONE: "green"}[self.state]
+        return f"color: {color}" if color else ''
