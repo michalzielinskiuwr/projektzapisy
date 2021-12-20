@@ -19,8 +19,6 @@ from gdstorage.storage import GoogleDriveStorage
 # Define Google Drive Storage
 gd_storage = GoogleDriveStorage()
 
-LOGGER = logging.getLogger(__name__)
-
 
 @employee_required
 def index(request):
@@ -55,7 +53,13 @@ def parse_names(request):
 def show_defect(request, defect_id):
     try:
         defect = Defect.objects.get(pk=defect_id)
-        return render(request, 'showDefect.html', {'defect': defect})
+        images = Image.objects.filter(defect=defect)
+        image_urls = []
+
+        for image in images:
+            image_urls.append(image.image.url[:-16])
+
+        return render(request, 'showDefect.html', {'defect': defect, 'image_urls': image_urls})
     except Defect.DoesNotExist:
         messages.error(request, "Nie istnieje usterka o podanym id.")
         return redirect('defects:main')

@@ -112,6 +112,9 @@ const AssetDefs = {
   "defect-form":[
       path.resolve("apps/defect/assets/defect_form.js")
   ],
+  "defect-style":[
+      path.resolve("apps/defect/assets/defect.css")
+  ]
 };
 
 module.exports = AssetDefs;
