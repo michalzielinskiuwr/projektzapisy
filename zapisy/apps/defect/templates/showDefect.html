@@ -1,4 +1,5 @@
 {% extends "defectBase.html" %}
+
 {% load render_bundle from webpack_loader %}
 {% load static %}
 
@@ -66,4 +67,5 @@
     {% for image_url in image_urls %}
         <img class="defect-image" src={{ image_url }} >
     {% endfor %}
+
 {% endblock %}

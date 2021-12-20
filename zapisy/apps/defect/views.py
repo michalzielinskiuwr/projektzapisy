@@ -134,4 +134,3 @@ def handle_post_request(request, if_edit=False, defect_id=None):
         context = {'form': form, 'formset': formset, "response": request.method,
                    'extra_images_number': ExtraImagesNumber, "edit": if_edit}
         return render(request, 'addDefect.html', context)
-
