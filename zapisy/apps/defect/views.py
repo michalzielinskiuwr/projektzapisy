@@ -19,6 +19,8 @@ from gdstorage.storage import GoogleDriveStorage
 # Define Google Drive Storage
 gd_storage = GoogleDriveStorage()
 
+LOGGER = logging.getLogger(__name__)
+
 
 @employee_required
 def index(request):
@@ -50,51 +52,6 @@ def parse_names(request):
 
 
 @employee_required
-def add_defect(request):
-    """Show form for create new defect."""
-    if request.method == 'POST':
-        return handle_post_request(request)
-    else:
-        form = DefectForm()
-    context = {'form': form, "response": request.method}
-    return render(request, 'addDefect.html', context)
-
-
-def new_defect(request):
-    if request.method == "POST":
-        form = DefectForm(request.POST, request.FILES)
-        formset = DefectImageFormSet(request.POST, request.FILES)
-        if form.is_valid():
-            defect = form.save(commit=False)
-            formset = DefectImageFormSet(request.POST, request.FILES, instance=defect)
-
-            if formset.is_valid():
-                defect.save()
-                formset.save()
-
-                return redirect(defect)
-    else:
-        form = DefectForm()
-        formset = DefectImageFormSet()
-    return render(request,
-                  'createDefectWithImages.html',
-                  {'form': form, 'formset': formset, 'extra_images_number': ExtraImagesNumber})
-
-
-def add_image(request):
-    if request.method == "POST":
-        image_form = ImageForm(request.POST, request.FILES)
-        if image_form.is_valid():
-            image_form.save()
-        return redirect('defects:image')
-
-    image_form = ImageForm()
-    photos = Image.objects.all()
-    return render(request=request, template_name="addImage.html",
-                  context={'form': image_form, 'photos': photos})
-
-
-@employee_required
 def show_defect(request, defect_id):
     try:
         defect = Defect.objects.get(pk=defect_id)
@@ -123,25 +80,54 @@ def edit_defect_helper(request, defect):
     return render(request, 'addDefect.html', context)
 
 
+@employee_required
+def add_defect(request):
+    """Show form for create new defect."""
+    if request.method == 'POST':
+        return handle_post_request(request)
+    else:
+        form = DefectForm()
+        formset = DefectImageFormSet()
+    context = {'form': form, 'formset': formset, "response": request.method, 'extra_images_number': ExtraImagesNumber}
+    return render(request, 'addDefect.html', context)
+
+
 def handle_post_request(request, if_edit=False, defect_id=None):
-    form = DefectForm(request.POST)
+    form = DefectForm(request.POST, request.FILES)
     if form.is_valid():
         creation_date = now()
         form_data = form.cleaned_data
+
         if if_edit:
             Defect.objects.filter(pk=defect_id).update(name=form_data['name'], last_modification=creation_date,
-                            description=form_data['description'], state=form_data['state'], place=form_data['place'])
+                                                       description=form_data['description'], state=form_data['state'],
+                                                       place=form_data['place'])
             messages.success(request, "Edytowano usterkę")
+
         else:
             defect = Defect(name=form_data['name'], creation_date=creation_date, last_modification=creation_date,
                             place=form_data['place'], description=form_data['description'], reporter=request.user,
                             state=form_data['state'])
-            defect.save()
-            messages.success(request, "Dodano usterkę")
-        return redirect('defects:main')
+
+            formset = DefectImageFormSet(request.POST, request.FILES, instance=defect)
+
+            if formset.is_valid():
+                defect.save()
+                formset.save()
+
+                messages.success(request, "Dodano pomyślnie usterkę")
+                return redirect('defects:main')
+
+            else:
+                messages.error(request, str(formset.errors))
+                context = {'form': form, 'formset': formset, "response": request.method,
+                           'extra_images_number': ExtraImagesNumber, "edit": if_edit}
+                return render(request, 'addDefect.html', context)
+
     else:
         messages.error(request, str(form.errors))
-        context = {'form': form, "response": request.method, "edit":if_edit}
+        formset = DefectImageFormSet()
+        context = {'form': form, 'formset': formset, "response": request.method,
+                   'extra_images_number': ExtraImagesNumber, "edit": if_edit}
         return render(request, 'addDefect.html', context)
-
 

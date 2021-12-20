@@ -26,7 +26,7 @@ function newImageClick(event) {
   // listOfEmpty.
   const first = listOfEmpty.shift();
 
-  // We find chosen element, display it and mark as active.
+  // We find chosen element and display it
   const newImageForm = $(".image-form").eq(first);
   newImageForm.removeClass("d-none");
 }
@@ -34,7 +34,7 @@ function newImageClick(event) {
 function saveEvent(event) {
   event.preventDefault();
   $(".image-form").find("input").prop("disabled", false);
-  $("#main-form").submit();
+  $("#main-form").trigger("submit");
 }
 
 $(function() {
@@ -47,16 +47,24 @@ $(function() {
   // Extra images in formset should remain hidden, as they are empty.
   formsetCounter = maxFormsetNumber - extraImagesNumber;
 
-  // Displaying image forms that are invalid.
-  $(".image-form")
-    .slice(formsetCounter, maxFormsetNumber)
-    .each((id, el) => {
-      if ($(el).find(".is-invalid")[0]) formsetCounter += 1;
-    });
+  if(formsetCounter === 0)formsetCounter++;
 
-  // We add position of available term forms to listOfEmpty.
-  $(".term-form").slice(0, formsetCounter).removeClass("d-none");
+  // We add position of available image forms to listOfEmpty.
+  $(".image-form").slice(0, formsetCounter).removeClass("d-none");
+
   for (let i = formsetCounter; i < maxFormsetNumber; i++) {
     listOfEmpty.push(i);
   }
+
+  $(".image-form label").empty();
+
+  $("#new-image-form").on(
+      "click",
+      newImageClick
+  );
+
+  $("#save-defect").on(
+      "click",
+      saveEvent
+  )
 });

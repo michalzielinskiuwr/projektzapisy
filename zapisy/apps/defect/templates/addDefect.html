@@ -1,6 +1,11 @@
 {% extends "defectBase.html" %}
-
+{% load render_bundle from webpack_loader %}
+{% load static %}
 {% load crispy_forms_tags %}
+
+{% block js %}
+{% render_bundle "defect-form" %}
+{% endblock %}
 
 {% block all-content %}
 <div id="defect-root">
@@ -13,10 +18,26 @@
             {% endif %}
         </h1>
     </div>
-    <form method="POST" class="post-form" enctype="multipart/form-data">
+
+    <input id="extra-images-number" class="d-none" value="{{ extra_images_number }}">
+
+    <form action="" method="POST" class="post-form" enctype="multipart/form-data" id="main-form">
         {% csrf_token %}
-        <input type="file" name="upload_photo" accept="image/*">
         {% crispy form %}
+
+        <hr>
+
+        <div id="image-formset" class="mb-5">
+            <h4>Zdjęcia</h4>
+            {{ formset.management_form }}
+            {% for image_form in formset %}
+                {% crispy image_form %}
+            {% endfor %}
+            <button class="btn btn-primary" id="new-image-form">Dodaj kolejne zdjęcie</button>
+        </div>
+
+        <button type="submit" class="save btn btn-success mt-3" id="save-defect">Zapisz</button>
     </form>
 </div>
+
 {% endblock %}
