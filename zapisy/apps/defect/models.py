@@ -1,6 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.urls import reverse
+from gdstorage.storage import GoogleDriveStorage
+
+# Define Google Drive Storage
+gd_storage = GoogleDriveStorage()
 
 DEFECT_MAX_NAME_SIZE = 255
 DEFECT_MAX_PLACE_SIZE = 255
@@ -29,3 +33,10 @@ class Defect(models.Model):
         color = {StateChoices.CREATED: None, StateChoices.IMPOSSIBLE: "red", StateChoices.LONGER_ISSUE: "red",
                  StateChoices.DONE: "green"}[self.state]
         return f"color: {color}" if color else ''
+
+
+class Image(models.Model):
+    image = models.ImageField(upload_to='defect', storage=gd_storage)
+    defect = models.ForeignKey(Defect, on_delete=models.CASCADE, null=False, blank=True)
+
+# TODO: przy usuwaniu usterki usuń ręcznie pliki z driva

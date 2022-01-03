@@ -106,6 +106,15 @@ const AssetDefs = {
     path.resolve("apps/users/assets/user-filter-list-index.js"),
   ],
   "users-consent-dialog": [path.resolve("apps/users/assets/consent-dialog.ts")],
+
+  // Defect App
+
+  "defect-form":[
+      path.resolve("apps/defect/assets/defect_form.js")
+  ],
+  "defect-style":[
+      path.resolve("apps/defect/assets/defect.css")
+  ]
 };
 
 module.exports = AssetDefs;

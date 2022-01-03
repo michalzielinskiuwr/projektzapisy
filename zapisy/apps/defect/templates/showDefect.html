@@ -1,5 +1,12 @@
 {% extends "defectBase.html" %}
 
+{% load render_bundle from webpack_loader %}
+{% load static %}
+
+{% block rendered_bundles %}
+    {% render_bundle "defect-style" %}
+{% endblock %}
+
 {% block main-subtitle %}System raportowania usterek{% endblock %}
 
 
@@ -54,4 +61,11 @@
     </table>
     <h2>Opis usterki</h2>
     {{ defect.description }}
+
+    <hr>
+
+    {% for image_url in image_urls %}
+        <img class="defect-image" src={{ image_url }} >
+    {% endfor %}
+
 {% endblock %}
