@@ -25,10 +25,12 @@ def index(request):
     if request.method == "POST":
         query = request.POST
         defects_list = parse_names(request)
-        if defects_list is None or len(defects_list) == 0:
+        if defects_list is None or len(defects_list) == 0 and query.get('print') is None:
             messages.error(request, "Akcja wymaga zaznaczenia elementów")
         elif query.get('print') is not None:
-            messages.info(request, "Metoda nie zaimplementowana.")
+            if defects_list is None or len(defects_list) == 0:
+                return print_defects(request)
+            return print_defects(request, Defect.objects.filter(pk__in=defects_list))
         elif query.get('done') is not None:
             Defect.objects.filter(pk__in=defects_list).update(state=StateChoices.DONE)
         elif query.get('delete') is not None:
@@ -130,7 +132,15 @@ def handle_post_request(request, if_edit=False, defect_id=None):
 
     else:
         messages.error(request, str(form.errors))
+        context = {'form': form, "response": request.method, "edit":if_edit}
+        return render(request, 'addDefect.html', context)
         formset = DefectImageFormSet()
         context = {'form': form, 'formset': formset, "response": request.method,
                    'extra_images_number': ExtraImagesNumber, "edit": if_edit}
         return render(request, 'addDefect.html', context)
+
+def print_defects(request, defects_list=None):
+    if defects_list==None:
+        return render(request, 'defectPrint.html', {'defects' : Defect.objects.all()})
+    else:
+        return render(request, 'defectPrint.html', {'defects' : Defect.objects.filter(pk__in=defects_list)})
