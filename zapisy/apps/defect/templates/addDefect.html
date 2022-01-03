@@ -5,7 +5,7 @@
 {% load crispy_forms_tags %}
 
 {% block js %}
-{% render_bundle "defect-form" %}
+    {% render_bundle "defect-form" %}
 {% endblock %}
 
 {% block all-content %}
@@ -30,6 +30,19 @@
 
         <div id="image-formset" class="mb-5">
             <h4>Zdjęcia</h4>
+
+            {% if edit %}
+                <div class="container-fluid" style="margin: 10px">
+                    <div class="row">
+                        {% for image_url in image_urls %}
+                            <div class="col-md-3 pop center-block">
+                                <img class="img-thumbnail" src={{ image_url }} >
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
             {{ formset.management_form }}
             {% for image_form in formset %}
                 {% crispy image_form %}
@@ -39,6 +52,8 @@
 
         <button type="submit" class="save btn btn-success mt-3" id="save-defect">Zapisz</button>
     </form>
+
+
 </div>
 
 {% endblock %}

@@ -114,6 +114,9 @@ const AssetDefs = {
   ],
   "defect-style":[
       path.resolve("apps/defect/assets/defect.css")
+  ],
+  "show-defect":[
+      path.resolve("apps/defect/assets/show_defect.js")
   ]
 };
 

@@ -35,9 +35,20 @@ def index(request):
             Defect.objects.filter(pk__in=defects_list).update(state=StateChoices.DONE)
         elif query.get('delete') is not None:
             to_delete = Defect.objects.filter(pk__in=defects_list)
+
+            images_to_delete = []
+            for defect in to_delete:
+                for image in defect.image_set.all():
+                    images_to_delete.append(image.image.name)
+
             query_set = ", ".join(map(lambda x: x['name'], list(to_delete.values())))
             messages.info(request, "Usunięto następujące usterki: " + query_set)
             to_delete.delete()
+
+            for image_name in images_to_delete:
+                image_path = '/zapisy/defect/' + image_name
+                if gd_storage.exists(image_path):
+                    gd_storage.delete(image_path)
         else:
             messages.error(request, "Nie wprowadzono metody. Ten błąd nie powinien się zdarzyć. Proszę o kontakt z "
                            "administratorem systemu zapisów.")
@@ -82,7 +93,14 @@ def edit_defect_helper(request, defect):
         return handle_post_request(request, if_edit=True, defect_id=defect.id)
     else:
         form = DefectForm(instance=defect)
-    context = {'form': form, "response": request.method, "edit": True}
+        formset = DefectImageFormSet()
+        images = Image.objects.filter(defect=defect)
+        image_urls = []
+
+        for image in images:
+            image_urls.append(image.image.url[:-16])
+    context = {'form': form, 'formset': formset, "response": request.method, "edit": True, 'image_urls': image_urls,
+               'extra_images_number': ExtraImagesNumber}
     return render(request, 'addDefect.html', context)
 
 
