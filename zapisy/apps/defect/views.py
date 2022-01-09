@@ -1,17 +1,12 @@
-import json
-
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.timezone import now
-
+from gdstorage.storage import GoogleDriveStorage
 from .models import Defect, StateChoices
 from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
 from apps.notifications.custom_signals import defect_modified
-
 from ..users.decorators import employee_required
-
-from gdstorage.storage import GoogleDriveStorage
 
 # Define Google Drive Storage
 gd_storage = GoogleDriveStorage()
@@ -48,8 +43,13 @@ def index(request):
                     gd_storage.delete(image_path)
         else:
             messages.error(request, "Nie wprowadzono metody. Ten błąd nie powinien się zdarzyć. Proszę o kontakt z "
-                           "administratorem systemu zapisów.")
-    return render(request, 'defectMain.html', {'defects': Defect.objects.all()})
+                                    "administratorem systemu zapisów.")
+    return render(request, "defectMain.html", {"defects": Defect.objects.all().select_related("reporter"),
+                                               "visibleDefects": [parse_defect(defect) for defect in
+                                                                  Defect.objects.all().select_related("reporter")]})
+    # return render(request, 'defectMain.html',
+    #           {'visibleDefects': [parse_defect(defect) for defect in Defect.objects.all().select_related("reporter")],
+    #                "defectUrlPrefix": "/defect/"})
 
 
 def parse_names(request):
@@ -57,6 +57,12 @@ def parse_names(request):
         return list(map(int, request.POST.getlist("names[]")))
     except Exception:
         return None
+
+
+def parse_defect(defect: Defect):
+    return {"id": defect.id, "name": defect.name, "place": defect.place, "status_color": defect.get_status_color(),
+            "state": defect.get_state_display(), "creation_date": defect.creation_date,
+            "last_modification": defect.last_modification}
 
 
 @employee_required
