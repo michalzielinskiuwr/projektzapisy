@@ -9,85 +9,12 @@
 
 <script src="https://www.kryogenix.org/code/browser/sorttable/sorttable.js"></script>
 
-<style>
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 34px;
-}
-
-.switch input { 
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  -webkit-transition: .4s;
-  transition: .4s;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
-}
-
-input:checked + .slider {
-  background-color: #2196F3;
-}
-
-input:focus + .slider {
-  box-shadow: 0 0 1px #2196F3;
-}
-
-input:checked + .slider:before {
-  -webkit-transform: translateX(26px);
-  -ms-transform: translateX(26px);
-  transform: translateX(26px);
-}
-
-/* Rounded sliders */
-.slider.round {
-  border-radius: 34px;
-}
-
-.slider.round:before {
-  border-radius: 50%;
-}
-</style>
-
-
-
-<label id="label_filter"> Filter OFF </label>
-
-<label class="switch">
-  <input type="checkbox" id="slider" onclick="filter()">
-  <span class="slider round"></span>
-</label>
-
 
 <div class="table-responsive">
 
     {% regroup groups by course as courses_list %}
 
-    <table id="mytab" class="table table-striped sortable">
+    <table class="table table-striped table-condensed table-bordered sortable">
         <thead class="text-muted">
             <tr>
             	<th scope="col">Przedmiot</th>
@@ -96,7 +23,6 @@ input:checked + .slider:before {
                 <th scope="col">Miejsca</th>
                 <th scope="col">Zapisani</th>
                 <th scope="col">Kolejka</th>
-                <th scope="col">Niezapisani</th>
                 <th scope="col">Przypięci</th>
                 <th></th>
             </tr>
@@ -104,9 +30,9 @@ input:checked + .slider:before {
         <tbody>
             {% for course, groups in courses_list %}
             
- 
+            
+  
                 {% for group in groups %}
-                <tr id='result_tr'>
                         <td> {{ course.name }} </td>                   
                         <td>{{group.teacher}}</td>
                         <td>{{ group.get_type_display }}</td>
@@ -121,15 +47,6 @@ input:checked + .slider:before {
                         </td>
                         <td>{{ group.enrolled }}</td>
                         <td>{{ group.queued }}</td>
-                        
-                     <td>
-                        {% with waiting_course=waiting_students|lookup:group.id %}
-                            {% for course_type in waiting_course %}
-                                        {{ waiting_course|lookup:course_type }}
-                            {% endfor %}
-                        {% endwith %}
-                    </td>
-                                              
                         <td>{{ group.pinned }}</td>
                         <td>
                             <a class="badge badge-sm badge-primary"
@@ -147,39 +64,11 @@ input:checked + .slider:before {
 </div>
 
 <script>
+$(function() {
+  $.bootstrapSortable({ sign: 'reversed', applyLast: false })
+  
+});
 
-
-
-document.getElementById("slider").checked=false;
-
-
-function filter(){
-
-var lbl = document.getElementById("label_filter");
-var slid = document.getElementById("slider");
-if(slid.checked==false){
-lbl.innerText="Filter OFF";
-for (let row of mytab.rows) 
-{
-    cell = row.cells[6];
-       if (cell.innerText!=""){
-            
-            row.style.display= 'table-row'; 
-       } 
-}
-}
-else{
-lbl.innerText="Filter ON";
-for (let row of mytab.rows) 
-{
-    cell = row.cells[6];
-       if (cell.innerText==""){
-            
-            row.style.display= 'none'; 
-       } 
-}
-}
-}
 </script>
 
 {% endblock %}
