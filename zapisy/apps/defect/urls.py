@@ -7,4 +7,5 @@ urlpatterns = [
     path('new', views.add_defect, name='new'),
     path('<int:defect_id>', views.show_defect, name='show_defect'),
     path('<int:defect_id>/edit', views.edit_defect, name='edit_defect'),
+    path('delete_image/<int:image_id>', views.delete_image, name='delete_image')
 ]

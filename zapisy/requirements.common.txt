@@ -13,6 +13,7 @@ django-test-without-migrations==0.6
 django-webpack-loader==0.7.0
 djangorestframework==3.12.4
 django-pagedown==2.2.1
+django-googledrive-storage==1.6.0
 
 ipdb==0.13.9
 prompt-toolkit==3.0.24

@@ -37,6 +37,12 @@ function saveEvent(event) {
   $("#main-form").trigger("submit");
 }
 
+function deleteImage(event) {
+  event.preventDefault();
+  const image_id = $(this).attr('id').slice(14);
+  $("#delete-form-" + image_id).trigger("submit");
+}
+
 $(function() {
   // We get number of image forms received from server.
   maxFormsetNumber = parseInt($('input[name="image_set-TOTAL_FORMS"]').val());
@@ -66,5 +72,10 @@ $(function() {
   $("#save-defect").on(
       "click",
       saveEvent
+  )
+
+  $(".delete-photo-button").on(
+      "click",
+      deleteImage
   )
 });

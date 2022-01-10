@@ -1,19 +1,10 @@
 @import "~bootstrap/scss/bootstrap";
 
-@media screen and (min-width: 480px) {
-    .defect-image {
-        max-width: 80%;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .defect-image {
-        max-width: 100%;
-    }
-}
-
-.defect-image {
-    margin-left: auto;
-    margin-right: auto;
+.delete-photo-button{
+    position: absolute;
+    top: 5px;
+    left: 20px;
+    z-index: 1000;
+    width: 25px;
 }
 
