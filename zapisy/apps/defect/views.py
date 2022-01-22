@@ -17,7 +17,7 @@ def index(request):
     if request.method == "POST":
         query = request.POST
         defects_list = parse_names(request)
-        if defects_list is None or len(defects_list) == 0 and query.get('print') is None:
+        if defects_list is None or len(defects_list) == 0:
             messages.error(request, "Akcja wymaga zaznaczenia elementów")
         elif query.get('print') is not None:
             if defects_list is None or len(defects_list) == 0:
@@ -54,14 +54,14 @@ def index(request):
 
 def parse_names(request):
     try:
-        return list(map(int, request.POST.getlist("names[]")))
+        return list(map(int, request.POST.get("defects_ids").split(';')))
     except Exception:
         return None
 
 
 def parse_defect(defect: Defect):
     return {"id": defect.id, "name": defect.name, "place": defect.place, "status_color": defect.get_status_color(),
-            "state": defect.get_state_display(), "creation_date": defect.creation_date,
+            "state": defect.get_state_display(), "state_id": [defect.state], "creation_date": defect.creation_date,
             "last_modification": defect.last_modification}
 
 

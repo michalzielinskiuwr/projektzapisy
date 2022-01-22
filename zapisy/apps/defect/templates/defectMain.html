@@ -3,17 +3,6 @@
 {% load crispy_forms_tags %}
 {% load render_bundle from webpack_loader %}
 
-{% block styles %}
-    <style>
-        .selected:nth-child(even){
-            background-color: pink !important;
-        }
-        .selected:nth-child(odd){
-            background-color: #9b50ba !important;
-        }
-    </style>
-{% endblock %}
-
 {% block bread %}
     <li class="breadcrumb-item">
         <a href="{% url "main-page" %}">Strona główna</a>
@@ -39,8 +28,11 @@
             <input type="submit" name="print" id="print-form-button" class="btn btn-primary" value="Drukuj">
             <input type="submit" name="delete" id="delete-form-button" class="btn btn-primary" value="Usuń">
             <input type="submit" name="done" id="done-form-button" class="btn btn-primary" value="Ustaw jako zrobione">
+            <input type="hidden" name="defects_ids" id="defects_ids" value="">
             </div>
         </div>
+    </form>
+
 
         <p class="row justify-content-center">
 
@@ -50,59 +42,16 @@
 
         <div id="defects-list"></div>
 
-        <table class="table table-striped sortable">
-            <thead>
-            <tr id="headers">
-                <th scope="col" class="az" data-defaultsign="nospan" data-defaultsort="asc">Nazwa Usterki</th>
-                <th scope="col" class="text-center">Miejsce usterki</th>
-                <th scope="col" class="text-center">Stan usterki</th>
-                <th scope="col" class="text-center">Data zgłoszenia</th>
-                <th scope="col" class="text-center">Data modyfikacji</th>
-            </tr>
-            </thead>
-                <tbody>
-                {% for defect in defects %}
-                    <tr id="{{ defect.id }}">
-                        <td><input type='checkbox' name='names[]' id="defect_checkbox_{{ defect.id }}" value='{{ defect.id }}'> <a href= {% url "defects:show_defect" defect.id %} >{{ defect.name }} </a> </td>
-                        <td class="text-center">{{ defect.place }}</td>
-                        <td class="text-center" style="{{ defect.get_status_color }}">{{ defect.get_state_display }}</td>
-                        <td class="text-center">{{ defect.creation_date }}</td>
-                        <td class="text-center">{{ defect.last_modification }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-        </table>
-    </form>
 
-
-    <div id="defect-root">
-
-    </div>
-    <form id="invisible_form" method="post">
-        {% csrf_token %}
-        <input id="post_action" name="action" type="hidden" value="mark-as-done">
-        <input id="post_data" name="ids " type="hidden" value="">
-    </form>
     <script>
-        $('input[id^=defect_checkbox_]').click(function(e){
-            let row = $(this).parent().parent()
-            if($(row).hasClass("selected")) $(row).removeClass("selected")
-            else $(row).addClass("selected")
-            e.stopPropagation()
-        })
-        $('tr').not('#headers').click(function(){
-            if($(this).hasClass("selected")) {
-                $(this).removeClass("selected")
-                $(this).find("[id^=defect_checkbox_]").prop("checked", false)
-            }
-            else {
-                $(this).addClass("selected")
-                $(this).find("[id^=defect_checkbox_]").prop("checked", true)
-            }
-        })
-        $('table a').click(function (e){
-            e.stopPropagation()
-        })
+         function prepareForm() {
+             let selected = $('tr.selected').map(function () {
+                 return this.id
+             }).toArray()
+             $("#defects_ids").val(selected.join(';'))
+         }
+
+         $("#action-form").on("submit", prepareForm)
     </script>
 {% endblock %}
 

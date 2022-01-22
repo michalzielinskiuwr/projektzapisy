@@ -42,17 +42,22 @@ export default class DefectList extends Vue {
     this.$store.subscribe((mutation, state) => {
       switch (mutation.type) {
         case "filters/registerFilter":
-          this.visibleDefects = this.defects // .filter(this.tester);
-          this.visibleDefects.sort(this.compare);
-          break;
         case "sorting/changeSorting":
-          this.visibleDefects = this.defects // .filter(this.tester);
+          this.visibleDefects = this.defects.filter(this.tester);
           this.visibleDefects.sort(this.compare);
           break;
       }
     });
   }
+
+  select(event) {
+    if(!event.currentTarget.classList.contains("selected"))
+      event.currentTarget.classList.add("selected")
+    else
+      event.currentTarget.classList.remove("selected")
+  }
 }
+
 </script>
 
 <style scoped>
@@ -62,20 +67,23 @@ export default class DefectList extends Vue {
   -ms-user-select: none;
   user-select: none;
 }
+.selected {
+  background-color: #c2dbff !important;
+}
 </style>
 
 <template>
-  <table class="table table-hover selection-none table-responsive-md">
-    <thead id="table-header">
-      <tr class="text-center">
+    <table class="table table-hover selection-none table-responsive-md">
+      <thead id="table-header">
+      <tr class="text-center" id="headers">
         <th>
-          <SorterField property="name" label="Nazwa Usterki" />
+          <SorterField property="name" label="Nazwa Usterki"/>
         </th>
         <th>
-          <SorterField property="place" label="Miejsce usterki" />
+          <SorterField property="place" label="Miejsce usterki"/>
         </th>
         <th>
-          <SorterField property="state" label="Stan Usterki" />
+          <SorterField property="state" label="Stan Usterki"/>
         </th>
         <th>
           <SorterField property="creation_date" label="Data zgłoszenia"/>
@@ -85,23 +93,21 @@ export default class DefectList extends Vue {
         </th>
       </tr>
     </thead>
-    <form>
       <tbody>
-        <tr v-for="defect of defects" :key="defect.id">
-          <input type='checkbox' name='names[]' :id="'defect_checkbox_' + defect.id" :value="defect.id">
-          <td class="align-middle">
-            <a class="btn-link" :href="'/defect/' + defect.id">{{ defect.title }}</a>
+        <tr v-on:click="select" v-class="{ selected: defect.selected }" v-for="defect of visibleDefects" :key="defect.id" :id="defect.id">
+          <td class="text-center align-middle">
+            <a class="btn-link" :href="'/defect/' + defect.id">{{ defect.name }}</a>
           </td>
           <td class="text-center align-middle">
             {{ defect.place }}
           </td>
-          <td class="align-middle" :style="defect.status_color">
+          <td class="text-center align-middle" :style="defect.status_color">
             {{ defect.state }}
           </td>
-          <td>
+          <td class="text-center">
             {{ defect.creation_date }}
           </td>
-          <td>
+          <td class="text-center">
             {{ defect.last_modification }}
           </td>
         </tr>
@@ -111,6 +117,7 @@ export default class DefectList extends Vue {
           </td>
         </tr>
       </tbody>
-    </form>
-  </table>
+    </table>
+
+
 </template>

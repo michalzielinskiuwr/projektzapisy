@@ -8,10 +8,11 @@ export interface DefectInfo {
     last_modification: Date,
     place: string,
     state: State,
+    selected: boolean,
     status_color: string
 }
 
-export type State = "Stworzone" | "Nie da się" | "Dłuższy problem" | "Zrobione"
+export type State = "Zgłoszone" | "Nie da się" | "Dłuższy problem" | "Zrobione"
 
 
 interface State {

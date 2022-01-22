@@ -5,7 +5,13 @@ export interface DefectInfo {
     last_modification: Date,
     place: string,
     state: State,
+    selected: boolean,
+    state_id: 0 | 1 | 2 | 3,
     status_color: string
 }
 
-export type State = "Stworzone" | "Nie da się" | "Dłuższy problem" | "Zrobione"
+export type State = "Zgłoszone" | "Nie da się" | "Dłuższy problem" | "Zrobione"
+
+export interface KVDict {
+  [key: number]: string;
+}

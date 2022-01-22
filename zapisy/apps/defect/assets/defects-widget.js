@@ -1,6 +1,6 @@
 import Vue from "vue";
-import DefectFilter from "./DefectFilter"
 import DefectList from "./DefectList";
+import DefectFilter from "./DefectFilter"
 import store from "./store";
 
 new Vue({

@@ -1,12 +1,10 @@
 <script lang="ts">
-// import {cloneDeep, sortBy, toPairs} from "lodash";
 import Vue from "vue";
 
-import TextFilter from "@/enrollment/timetable/assets/components/filters/TextFilter.vue";
-import LabelsFilter from "@/enrollment/timetable/assets/components/filters/LabelsFilter.vue";
-import SelectFilter from "@/enrollment/timetable/assets/components/filters/SelectFilter.vue";
-import CheckFilter from "@/enrollment/timetable/assets/components/filters/CheckFilter.vue";
-// import { DefectInfo } from "./models.ts"
+import TextFilter from "./components/filters/TextFilter.vue";
+import LabelsFilter from "./components/filters/LabelsFilter.vue";
+import SelectFilter from "./components/filters/SelectFilter.vue";
+import CheckFilter from "./components/filters/CheckFilter.vue";
 
 export default Vue.extend({
   components: {
@@ -17,10 +15,10 @@ export default Vue.extend({
   },
   data: function () {
     return {
+      allStates: { 0: "Zgłoszone", 1: "Nie da się", 2: "Dłuższy problem", 3: "Zrobione"}
     };
   },
   created: function () {
-    this.allStates = { 0: "Stworzone", 1: "Nie da się", 2: "Dłuższy problem", 3: "Zrobione"}
   },
 });
 </script>
@@ -33,24 +31,24 @@ export default Vue.extend({
         <div class="col">
           <TextFilter
             filterKey="name-filter"
-            property="name"
+            :properties="['name']"
             placeholder="Nazwa usterki"
           />
         </div>
         <div class="col">
-          <LabelsFilter
-            title="Stany"
-            filterKey="state-filter"
-            property="state"
-            :allLabels="allStates"
-            onClass="badge-success"
+          <TextFilter
+            filterKey="place-filter"
+            :properties="['place']"
+            placeholder="Miejsce usterki"
           />
           </div>
         <div class="col">
-          <SelectFilter
-            filterKey="place-filter"
-            property="place"
-            placeholder="Miejsce usterki"
+          <LabelsFilter
+            title="Stany"
+            filterKey="state-filter"
+            property="state_id"
+            :allLabels="allStates"
+            onClass="badge-success"
           />
           </div>
       </div>
