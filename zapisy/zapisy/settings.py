@@ -244,7 +244,6 @@ INSTALLED_APPS = (
     'django_rq',
     'webpack_loader',
     'pagedown.apps.PagedownConfig',
-    'apps.file_manager',
 )
 
 AUTHENTICATION_BACKENDS = (

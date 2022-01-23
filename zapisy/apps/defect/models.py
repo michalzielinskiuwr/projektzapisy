@@ -8,10 +8,11 @@ gd_storage = GoogleDriveStorage()
 
 DEFECT_MAX_NAME_SIZE = 255
 DEFECT_MAX_PLACE_SIZE = 255
+DEFECT_MAX_INFORMATION_FROM_REPAIRER_SIZE = 255
 
 
 class StateChoices(models.IntegerChoices):
-    CREATED = 0, "Stworzone"
+    CREATED = 0, "Zgłoszone"
     IMPOSSIBLE = 1, "Nie da się"
     LONGER_ISSUE = 2, "Dłuższy problem"
     DONE = 3, "Zrobione"
@@ -25,6 +26,7 @@ class Defect(models.Model):
     description = models.TextField("Opis usterki", blank=True)
     reporter = models.ForeignKey(User, on_delete=models.CASCADE)
     state = models.PositiveSmallIntegerField("Stan", choices=StateChoices.choices, default=StateChoices.CREATED)
+    information_from_repairer = models.TextField("Informacja od serwisanta", blank=True)
 
     def get_url(self):
         return reverse('defects:show_defect', args=[str(self.id)])

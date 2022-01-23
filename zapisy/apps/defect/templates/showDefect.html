@@ -2,6 +2,7 @@
 
 {% load render_bundle from webpack_loader %}
 {% load static %}
+{% load crispy_forms_tags %}
 
 {% block rendered_bundles %}
     {% render_bundle "defect-style" %}
@@ -65,6 +66,34 @@
     </table>
     <h2>Opis usterki</h2>
     {{ defect.description }}
+
+    <hr>
+
+    <h3>Informacja od serwisanta</h3>
+    <div id="info-div">
+        <div id="info-text">
+            {% if defect.information_from_repairer %}
+                {{ defect.information_from_repairer }}
+            {% else %}
+                <p>Nie ma jeszcze żadnej informacji od serwisanta</p>
+            {% endif %}
+        </div>
+        <button class="btn btn-info" type="button" id="show-info-form-button">
+            {% if defect.information_from_repairer %}
+                Edytuj
+            {% else %}
+                Dodaj
+            {% endif %}
+        </button>
+    </div>
+
+    <div id="info-form-div" class="d-none">
+        <form action="{% url 'defects:repair_info' defect.id %}" method="post" id="info-form">
+            {% csrf_token %}
+            {% crispy info_form %}
+            <button class="btn btn-success" type="submit">Zapisz</button>
+        </form>
+    </div>
 
     <hr>
 
