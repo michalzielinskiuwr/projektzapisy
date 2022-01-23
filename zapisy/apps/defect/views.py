@@ -1,16 +1,13 @@
 import json
 
 from django.contrib import messages
-from django.db import transaction
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse_lazy
 from django.utils.timezone import now
 
 from .models import Defect, StateChoices
-
 from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
-
+from apps.notifications.custom_signals import defect_modified
 
 from ..users.decorators import employee_required
 
@@ -142,6 +139,13 @@ def edit_defect_post_request(request, defect_id):
                   place=form_data['place'])
     formset.save()
 
+    if request.user.id != defect.get().reporter.id:
+        defect_modified.send_robust(
+            sender=Defect,
+            instance=defect.get(),
+            user=defect.get().reporter
+        )
+
     messages.success(request, "Edytowano usterkę")
     return redirect('defects:show_defect', defect_id=defect_id)
 
@@ -186,6 +190,13 @@ def delete_image(request, image_id):
         if gd_storage.exists(image_path):
             gd_storage.delete(image_path)
 
+        if request.user.id != image.defect.reporter.id:
+            defect_modified.send_robust(
+                sender=Defect,
+                instance=image.defect,
+                user=image.defect.reporter
+            )
+
         messages.success(request, "Pomyślnie usnięto zdjęcie")
         return redirect('defects:edit_defect', defect_id=defect_id)
     raise Http404
@@ -201,6 +212,13 @@ def post_information_from_repairer(request, defect_id):
         info_form_data = info_form.cleaned_data
         defect = Defect.objects.filter(pk=defect_id)
         defect.update(information_from_repairer=info_form_data['information_from_repairer'])
+
+        if request.user.id != defect.get().reporter.id:
+            defect_modified.send_robust(
+                sender=Defect,
+                instance=defect.get(),
+                user=defect.get().reporter
+            )
 
         messages.success(request, "Pomyślnie zmieniono informację od serwisanta")
         return redirect('defects:show_defect', defect_id=defect_id)
