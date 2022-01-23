@@ -44,6 +44,7 @@
                                     class="btn btn-danger close delete-photo-button"
                                     type="button"
                                     id="delete-button-{{ image.0 }}"
+                                    style="background-color: red"
                                 >
                                     <span aria-hidden="true">&times;</span>
                                     <span class="sr-only">Delete</span>
@@ -56,9 +57,26 @@
             {% endif %}
 
             {{ formset.management_form }}
-            {% for image_form in formset %}
-                {% crispy image_form %}
-            {% endfor %}
+            <div class="container-fluid" id="image-fields">
+                {% for image_form in formset %}
+                    <div class="row no-gutters">
+                        <div class="col">
+                            {% crispy image_form %}
+                        </div>
+                        <div class="col-auto">
+                            <button
+                                    class="btn btn-danger delete-field-button d-none"
+                                    type="button"
+                                    style="margin-top: 24px"
+                            >
+                                Usuń
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+
             <button class="btn btn-primary" id="new-image-form">Dodaj kolejne zdjęcie</button>
         </div>
 

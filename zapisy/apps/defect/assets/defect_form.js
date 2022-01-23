@@ -24,11 +24,12 @@ function newImageClick(event) {
 
   // We choose position of the first empty image form and remove it from
   // listOfEmpty.
-  const first = listOfEmpty.shift();
+  const firstFree = listOfEmpty.shift();
 
   // We find chosen element and display it
-  const newImageForm = $(".image-form").eq(first);
+  const newImageForm = $(".image-form").eq(firstFree);
   newImageForm.removeClass("d-none");
+  $(".delete-field-button").eq(firstFree).removeClass("d-none")
 }
 
 function saveEvent(event) {
@@ -41,6 +42,13 @@ function deleteImage(event) {
   event.preventDefault();
   const image_id = $(this).attr('id').slice(14);
   $("#delete-form-" + image_id).trigger("submit");
+}
+
+function deleteImageField(event) {
+  event.preventDefault();
+  const buttonIndex = $(".delete-field-button").index(this);
+  $('.image-form').eq(buttonIndex).empty();
+  $(this).addClass("d-none");
 }
 
 $(function() {
@@ -78,4 +86,11 @@ $(function() {
       "click",
       deleteImage
   )
+
+  $(".delete-field-button")
+      .on(
+          "click",
+          deleteImageField
+      )
+      .first().removeClass("d-none")
 });

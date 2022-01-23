@@ -6,8 +6,6 @@ from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.utils.timezone import now
-from django.views.generic import CreateView
-from django.views.generic import DeleteView
 
 from .models import Defect, StateChoices
 
@@ -143,7 +141,7 @@ def edit_defect_post_request(request, defect_id):
     formset.save()
 
     messages.success(request, "Edytowano usterkę")
-    return redirect('defects:main')
+    return redirect('defects:show_defect', defect_id=defect_id)
 
 
 def add_defect_post_request(request):
