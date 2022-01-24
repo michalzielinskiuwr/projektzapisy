@@ -16,8 +16,8 @@ gd_storage = GoogleDriveStorage()
 def index(request):
     if request.method == "POST":
         query = request.POST
-        defects_list = parse_names(request)
-        if defects_list is None or len(defects_list) == 0:
+        if_empty, defects_list = parse_names(request)
+        if (query.get('print') is None and not (if_empty is False)) or len(defects_list) == 0:
             messages.error(request, "Akcja wymaga zaznaczenia elementów")
         elif query.get('print') is not None:
             if defects_list is None or len(defects_list) == 0:
@@ -47,16 +47,15 @@ def index(request):
     return render(request, "defectMain.html", {"defects": Defect.objects.all().select_related("reporter"),
                                                "visibleDefects": [parse_defect(defect) for defect in
                                                                   Defect.objects.all().select_related("reporter")]})
-    # return render(request, 'defectMain.html',
-    #           {'visibleDefects': [parse_defect(defect) for defect in Defect.objects.all().select_related("reporter")],
-    #                "defectUrlPrefix": "/defect/"})
 
 
 def parse_names(request):
     try:
-        return list(map(int, request.POST.get("defects_ids").split(';')))
+        return int(request.POST.get("if_form_empty")) != 0, \
+               list(map(int, request.POST.get("defects_ids").split(';')))
     except Exception:
-        return None
+        return True, []
+
 
 
 def parse_defect(defect: Defect):

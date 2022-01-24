@@ -29,6 +29,7 @@
             <input type="submit" name="delete" id="delete-form-button" class="btn btn-primary" value="Usuń">
             <input type="submit" name="done" id="done-form-button" class="btn btn-primary" value="Ustaw jako zrobione">
             <input type="hidden" name="defects_ids" id="defects_ids" value="">
+            <input type="hidden" name="if_form_empty" id="if_form_empty" value="0">
             </div>
         </div>
     </form>
@@ -45,9 +46,18 @@
 
     <script>
          function prepareForm() {
-             let selected = $('tr.selected').map(function () {
-                 return this.id
-             }).toArray()
+             let selected
+             if($('tr.selected').length == 0){
+                $("#if_form_empty").val("1")
+                 selected = $('tbody tr').map(function () {
+                     return this.id
+                 }).toArray()
+             }
+             else {
+                 selected = $('tbody tr.selected').map(function () {
+                     return this.id
+                 }).toArray()
+             }
              $("#defects_ids").val(selected.join(';'))
          }
 
