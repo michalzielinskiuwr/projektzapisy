@@ -109,15 +109,9 @@ const AssetDefs = {
 
   // Defect App
 
-  "defect-form":[
-      path.resolve("apps/defect/assets/defect_form.js")
-  ],
-  "defect-style":[
-      path.resolve("apps/defect/assets/defect.css")
-  ],
-  "show-defect":[
-      path.resolve("apps/defect/assets/show_defect.js")
-  ]
+  "defect-form": [path.resolve("apps/defect/assets/defect_form.js")],
+  "defect-style": [path.resolve("apps/defect/assets/defect.css")],
+  "show-defect": [path.resolve("apps/defect/assets/show_defect.js")],
 };
 
 module.exports = AssetDefs;

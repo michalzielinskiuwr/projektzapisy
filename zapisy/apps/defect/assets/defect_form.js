@@ -13,7 +13,6 @@ let extraImagesNumber = 0;
 // available. List is in ascending order.
 const listOfEmpty = [];
 
-
 function newImageClick(event) {
   event.preventDefault();
   if (formsetCounter === maxFormsetNumber) return;
@@ -29,7 +28,7 @@ function newImageClick(event) {
   // We find chosen element and display it
   const newImageForm = $(".image-form").eq(firstFree);
   newImageForm.removeClass("d-none");
-  $(".delete-field-button").eq(firstFree).removeClass("d-none")
+  $(".delete-field-button").eq(firstFree).removeClass("d-none");
 }
 
 function saveEvent(event) {
@@ -40,18 +39,18 @@ function saveEvent(event) {
 
 function deleteImage(event) {
   event.preventDefault();
-  const image_id = $(this).attr('id').slice(14);
+  const image_id = $(this).attr("id").slice(14);
   $("#delete-form-" + image_id).trigger("submit");
 }
 
 function deleteImageField(event) {
   event.preventDefault();
   const buttonIndex = $(".delete-field-button").index(this);
-  $('.image-form').eq(buttonIndex).empty();
+  $(".image-form").eq(buttonIndex).empty();
   $(this).addClass("d-none");
 }
 
-$(function() {
+$(function () {
   // We get number of image forms received from server.
   maxFormsetNumber = parseInt($('input[name="image_set-TOTAL_FORMS"]').val());
 
@@ -61,7 +60,7 @@ $(function() {
   // Extra images in formset should remain hidden, as they are empty.
   formsetCounter = maxFormsetNumber - extraImagesNumber;
 
-  if(formsetCounter === 0)formsetCounter++;
+  if (formsetCounter === 0) formsetCounter++;
 
   // We add position of available image forms to listOfEmpty.
   $(".image-form").slice(0, formsetCounter).removeClass("d-none");
@@ -72,25 +71,14 @@ $(function() {
 
   $(".image-form label").empty();
 
-  $("#new-image-form").on(
-      "click",
-      newImageClick
-  );
+  $("#new-image-form").on("click", newImageClick);
 
-  $("#save-defect").on(
-      "click",
-      saveEvent
-  )
+  $("#save-defect").on("click", saveEvent);
 
-  $(".delete-photo-button").on(
-      "click",
-      deleteImage
-  )
+  $(".delete-photo-button").on("click", deleteImage);
 
   $(".delete-field-button")
-      .on(
-          "click",
-          deleteImageField
-      )
-      .first().removeClass("d-none")
+    .on("click", deleteImageField)
+    .first()
+    .removeClass("d-none");
 });
