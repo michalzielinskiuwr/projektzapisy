@@ -50,9 +50,13 @@ export default class DefectList extends Vue {
     });
   }
 
+  // @ts-ignore
   select(event) {
+    // @ts-ignore
     if (!event.currentTarget.classList.contains("selected"))
+      // @ts-ignore
       event.currentTarget.classList.add("selected");
+    // @ts-ignore
     else event.currentTarget.classList.remove("selected");
   }
 }
