@@ -65,9 +65,13 @@
                     <td class="text-center" style="{{ defect.get_status_color }}">{{ defect.get_state_display }}</td>
                     <td class="text-center">{{ defect.creation_date }}</td>
                 </tr>
-                <tr>
-                    <td class="text-center" colspan="4">{{ defect.description }}</td>
-                </tr>
+                {% if defect.description != "" %}
+                    <tr>
+                        <td class="text-center" colspan="4">{{ defect.description }}</td>
+                    </tr>
+                {% else %}
+                    <tr style="display:none;"></tr>
+                {% endif %}
             {% endfor %}
             </tbody>
     </table></form>
@@ -79,3 +83,7 @@
 <script>
     window.print()
 </script>
+
+<style>
+
+</style>
