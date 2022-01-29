@@ -91,14 +91,13 @@ export default class DefectList extends Vue {
           <SorterField property="creation_date" label="Data zgłoszenia" />
         </th>
         <th>
-          <SorterField property="modification_date" label="Data modyfikacji" />
+          <SorterField property="last_modification" label="Data modyfikacji" />
         </th>
       </tr>
     </thead>
     <tbody>
       <tr
         v-on:click="select"
-        v-class="{ selected: defect.selected }"
         v-for="defect of visibleDefects"
         :key="defect.id"
         :id="defect.id"

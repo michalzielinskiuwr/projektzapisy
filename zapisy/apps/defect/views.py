@@ -60,8 +60,9 @@ def parse_names(request):
 
 def parse_defect(defect: Defect):
     return {"id": defect.id, "name": defect.name, "place": defect.place, "status_color": defect.get_status_color(),
-            "state": defect.get_state_display(), "state_id": [defect.state], "creation_date": defect.creation_date,
-            "last_modification": defect.last_modification}
+            "state": defect.get_state_display(), "state_id": [defect.state],
+            "creation_date": defect.creation_date.strftime('%Y-%m-%d %H:%M:%S'),
+            "last_modification": defect.last_modification.strftime('%Y-%m-%d %H:%M:%S')}
 
 
 @employee_required
