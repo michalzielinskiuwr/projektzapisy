@@ -2,18 +2,21 @@ import { values, sortBy } from "lodash";
 import { ActionContext } from "vuex";
 
 export interface DefectInfo {
-    id: number,
-    name: string,
-    creation_date: Date,
-    last_modification: Date,
-    place: string,
-    state: State,
-    selected: boolean,
-    status_color: string
+  id: number;
+  name: string;
+  creation_date: Date;
+  last_modification: Date;
+  place: string;
+  state: PossibleStates;
+  selected: boolean;
+  status_color: string;
 }
 
-export type State = "Zgłoszone" | "Nie da się" | "Dłuższy problem" | "Zrobione"
-
+export type PossibleStates =
+  | "Zgłoszone"
+  | "Nie da się"
+  | "Dłuższy problem"
+  | "Zrobione";
 
 interface State {
   defects: DefectInfo[];

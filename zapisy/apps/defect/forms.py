@@ -1,14 +1,9 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit
+from crispy_forms.layout import Layout, Div
 from django import forms
-
 from django.forms import inlineformset_factory
 
-from .models import Defect, DEFECT_MAX_PLACE_SIZE, DEFECT_MAX_NAME_SIZE, Image,\
-    DEFECT_MAX_INFORMATION_FROM_REPAIRER_SIZE
-
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Field, Layout, Row, Column, HTML, Div
+from .models import Defect, DEFECT_MAX_PLACE_SIZE, DEFECT_MAX_NAME_SIZE, Image
 
 
 class DefectFormBase(forms.ModelForm):
@@ -31,7 +26,6 @@ class DefectForm(DefectFormBase):
 
 
 class ImageForm(forms.ModelForm):
-
     class Meta:
         model = Image
         fields = ('image',)
@@ -68,5 +62,3 @@ class InformationFromRepairerForm(forms.ModelForm):
         self.fields['information_from_repairer'].label = ""
         self.helper = FormHelper()
         self.helper.form_tag = False
-
-

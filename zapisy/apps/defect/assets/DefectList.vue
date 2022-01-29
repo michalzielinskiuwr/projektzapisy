@@ -51,13 +51,11 @@ export default class DefectList extends Vue {
   }
 
   select(event) {
-    if(!event.currentTarget.classList.contains("selected"))
-      event.currentTarget.classList.add("selected")
-    else
-      event.currentTarget.classList.remove("selected")
+    if (!event.currentTarget.classList.contains("selected"))
+      event.currentTarget.classList.add("selected");
+    else event.currentTarget.classList.remove("selected");
   }
 }
-
 </script>
 
 <style scoped>
@@ -73,51 +71,57 @@ export default class DefectList extends Vue {
 </style>
 
 <template>
-    <table class="table table-hover selection-none table-responsive-md">
-      <thead id="table-header">
+  <table class="table table-hover selection-none table-responsive-md">
+    <thead id="table-header">
       <tr class="text-center" id="headers">
         <th>
-          <SorterField property="name" label="Nazwa Usterki"/>
+          <SorterField property="name" label="Nazwa Usterki" />
         </th>
         <th>
-          <SorterField property="place" label="Miejsce usterki"/>
+          <SorterField property="place" label="Miejsce usterki" />
         </th>
         <th>
-          <SorterField property="state" label="Stan Usterki"/>
+          <SorterField property="state" label="Stan Usterki" />
         </th>
         <th>
-          <SorterField property="creation_date" label="Data zgłoszenia"/>
+          <SorterField property="creation_date" label="Data zgłoszenia" />
         </th>
         <th>
-          <SorterField property="modification_date" label="Data modyfikacji"/>
+          <SorterField property="modification_date" label="Data modyfikacji" />
         </th>
       </tr>
     </thead>
-      <tbody>
-        <tr v-on:click="select" v-class="{ selected: defect.selected }" v-for="defect of visibleDefects" :key="defect.id" :id="defect.id">
-          <td class="text-center align-middle">
-            <a class="btn-link" :href="'/defect/' + defect.id">{{ defect.name }}</a>
-          </td>
-          <td class="text-center align-middle">
-            {{ defect.place }}
-          </td>
-          <td class="text-center align-middle" :style="defect.status_color">
-            {{ defect.state }}
-          </td>
-          <td class="text-center">
-            {{ defect.creation_date }}
-          </td>
-          <td class="text-center">
-            {{ defect.last_modification }}
-          </td>
-        </tr>
-        <tr v-if="!visibleDefects.length" class="text-center">
-          <td colspan="5">
-            <em class="text-muted">Brak widocznych usterek.</em>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-
+    <tbody>
+      <tr
+        v-on:click="select"
+        v-class="{ selected: defect.selected }"
+        v-for="defect of visibleDefects"
+        :key="defect.id"
+        :id="defect.id"
+      >
+        <td class="text-center align-middle">
+          <a class="btn-link" :href="'/defect/' + defect.id">{{
+            defect.name
+          }}</a>
+        </td>
+        <td class="text-center align-middle">
+          {{ defect.place }}
+        </td>
+        <td class="text-center align-middle" :style="defect.status_color">
+          {{ defect.state }}
+        </td>
+        <td class="text-center">
+          {{ defect.creation_date }}
+        </td>
+        <td class="text-center">
+          {{ defect.last_modification }}
+        </td>
+      </tr>
+      <tr v-if="!visibleDefects.length" class="text-center">
+        <td colspan="5">
+          <em class="text-muted">Brak widocznych usterek.</em>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </template>

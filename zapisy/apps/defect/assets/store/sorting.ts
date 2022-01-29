@@ -14,7 +14,10 @@ const state: State = {
 const getters = {
   // compare compares two defects based on current sorter
   compare: (state: State) => (a: DefectInfo, b: DefectInfo) => {
-    if (state.property == "last_modification" || state.property=="creation_date") {
+    if (
+      state.property == "last_modification" ||
+      state.property == "creation_date"
+    ) {
       let propGetter = property(state.property) as (c: DefectInfo) => number;
       return state.order
         ? propGetter(a) - propGetter(b)

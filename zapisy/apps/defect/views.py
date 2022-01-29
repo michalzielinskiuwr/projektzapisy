@@ -3,9 +3,10 @@ from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.timezone import now
 from gdstorage.storage import GoogleDriveStorage
-from .models import Defect, StateChoices
-from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
+
 from apps.notifications.custom_signals import defect_modified
+from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
+from .models import Defect, StateChoices
 from ..users.decorators import employee_required
 
 # Define Google Drive Storage
@@ -55,7 +56,6 @@ def parse_names(request):
                list(map(int, request.POST.get("defects_ids").split(';')))
     except Exception:
         return True, []
-
 
 
 def parse_defect(defect: Defect):
@@ -179,9 +179,9 @@ def add_defect_post_request(request):
 
 def print_defects(request, defects_list=None):
     if defects_list is None:
-        return render(request, 'defectPrint.html', {'defects' : Defect.objects.all()})
+        return render(request, 'defectPrint.html', {'defects': Defect.objects.all()})
     else:
-        return render(request, 'defectPrint.html', {'defects' : Defect.objects.filter(pk__in=defects_list)})
+        return render(request, 'defectPrint.html', {'defects': Defect.objects.filter(pk__in=defects_list)})
 
 
 def delete_image(request, image_id):

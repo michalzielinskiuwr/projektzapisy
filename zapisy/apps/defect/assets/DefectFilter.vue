@@ -15,14 +15,17 @@ export default Vue.extend({
   },
   data: function () {
     return {
-      allStates: { 0: "Zgłoszone", 1: "Nie da się", 2: "Dłuższy problem", 3: "Zrobione"}
+      allStates: {
+        0: "Zgłoszone",
+        1: "Nie da się",
+        2: "Dłuższy problem",
+        3: "Zrobione",
+      },
     };
   },
-  created: function () {
-  },
+  created: function () {},
 });
 </script>
-
 
 <template>
   <div class="card bg-light">
@@ -41,7 +44,7 @@ export default Vue.extend({
             :properties="['place']"
             placeholder="Miejsce usterki"
           />
-          </div>
+        </div>
         <div class="col">
           <LabelsFilter
             title="Stany"
@@ -50,7 +53,7 @@ export default Vue.extend({
             :allLabels="allStates"
             onClass="badge-success"
           />
-          </div>
+        </div>
       </div>
     </div>
   </div>
