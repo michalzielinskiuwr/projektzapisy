@@ -62,7 +62,7 @@
                             <a href="{% url 'theses:main' %}" class="nav-link">Prace dyplomowe</a>
                         </li>
                     {% endif %}
-                    {% if user.is_authenticated and user.is_staff %}
+                    {% if user.employee or user.is_staff %}
                             <li {% block defect_active %}{% endblock %} class="nav-item">
                                 <a href="{% url 'defects:main' %}" class="nav-link">Usterki</a>
                             </li>

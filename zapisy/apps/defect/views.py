@@ -1,17 +1,13 @@
-import json
-
 from django.contrib import messages
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils.timezone import now
-
-from .models import Defect, StateChoices
-from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
-from apps.notifications.custom_signals import defect_modified
-
-from ..users.decorators import employee_required
-
 from gdstorage.storage import GoogleDriveStorage
+
+from apps.notifications.custom_signals import defect_modified
+from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
+from .models import Defect, StateChoices
+from ..users.decorators import employee_required
 
 # Define Google Drive Storage
 gd_storage = GoogleDriveStorage()
@@ -21,8 +17,8 @@ gd_storage = GoogleDriveStorage()
 def index(request):
     if request.method == "POST":
         query = request.POST
-        defects_list = parse_names(request)
-        if defects_list is None or len(defects_list) == 0 and query.get('print') is None:
+        if_empty, defects_list = parse_names(request)
+        if (query.get('print') is None and not (if_empty is False)) or len(defects_list) == 0:
             messages.error(request, "Akcja wymaga zaznaczenia elementów")
         elif query.get('print') is not None:
             if defects_list is None or len(defects_list) == 0:
@@ -48,15 +44,24 @@ def index(request):
                     gd_storage.delete(image_path)
         else:
             messages.error(request, "Nie wprowadzono metody. Ten błąd nie powinien się zdarzyć. Proszę o kontakt z "
-                           "administratorem systemu zapisów.")
-    return render(request, 'defectMain.html', {'defects': Defect.objects.all()})
+                                    "administratorem systemu zapisów.")
+    return render(request, "defectMain.html", {"defects": Defect.objects.all().select_related("reporter"),
+                                               "visibleDefects": [parse_defect(defect) for defect in
+                                                                  Defect.objects.all().select_related("reporter")]})
 
 
 def parse_names(request):
     try:
-        return list(map(int, request.POST.getlist("names[]")))
+        return int(request.POST.get("if_form_empty")) != 0, \
+               list(map(int, request.POST.get("defects_ids").split(';')))
     except Exception:
-        return None
+        return True, []
+
+
+def parse_defect(defect: Defect):
+    return {"id": defect.id, "name": defect.name, "place": defect.place, "status_color": defect.get_status_color(),
+            "state": defect.get_state_display(), "state_id": [defect.state], "creation_date": defect.creation_date,
+            "last_modification": defect.last_modification}
 
 
 @employee_required
@@ -174,9 +179,9 @@ def add_defect_post_request(request):
 
 def print_defects(request, defects_list=None):
     if defects_list is None:
-        return render(request, 'defectPrint.html', {'defects' : Defect.objects.all()})
+        return render(request, 'defectPrint.html', {'defects': Defect.objects.all()})
     else:
-        return render(request, 'defectPrint.html', {'defects' : Defect.objects.filter(pk__in=defects_list)})
+        return render(request, 'defectPrint.html', {'defects': Defect.objects.filter(pk__in=defects_list)})
 
 
 def delete_image(request, image_id):
