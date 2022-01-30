@@ -4,8 +4,8 @@ import { ActionContext } from "vuex";
 export interface DefectInfo {
   id: number;
   name: string;
-  creation_date: Date;
-  last_modification: Date;
+  creation_date: string;
+  last_modification: string;
   place: string;
   state: PossibleStates;
   selected: boolean;
