@@ -40,3 +40,7 @@ class Defect(models.Model):
 class Image(models.Model):
     image = models.ImageField(upload_to='defect', storage=gd_storage)
     defect = models.ForeignKey(Defect, on_delete=models.CASCADE, null=False, blank=True)
+
+
+class DefectMaintainer(models.Model):
+    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
