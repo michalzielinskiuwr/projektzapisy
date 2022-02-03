@@ -6,7 +6,7 @@ from gdstorage.storage import GoogleDriveStorage
 
 from apps.notifications.custom_signals import defect_modified
 from .forms import DefectForm, Image, DefectImageFormSet, ExtraImagesNumber, InformationFromRepairerForm
-from .models import Defect, StateChoices
+from .models import Defect, StateChoices, DefectMaintainer
 from ..users.decorators import employee_required
 
 # Define Google Drive Storage
@@ -15,6 +15,7 @@ gd_storage = GoogleDriveStorage()
 
 @employee_required
 def index(request):
+    is_repairer_val = is_repairer(request.user.id)
     if request.method == "POST":
         query = request.POST
         if_empty, defects_list = parse_names(request)
@@ -25,29 +26,38 @@ def index(request):
                 return print_defects(request)
             return print_defects(request, Defect.objects.filter(pk__in=defects_list))
         elif query.get('done') is not None:
-            Defect.objects.filter(pk__in=defects_list).update(state=StateChoices.DONE)
+            if is_repairer_val:
+                Defect.objects.filter(pk__in=defects_list).update(state=StateChoices.DONE)
+            else:
+                messages.error(request,
+                               "Stan może zostać zmieniony tylko przez osoby do tego wyznaczone")
         elif query.get('delete') is not None:
-            to_delete = Defect.objects.filter(pk__in=defects_list)
+            if is_repairer_val:
+                to_delete = Defect.objects.filter(pk__in=defects_list)
 
-            images_to_delete = []
-            for defect in to_delete:
-                for image in defect.image_set.all():
-                    images_to_delete.append(image.image.name)
+                images_to_delete = []
+                for defect in to_delete:
+                    for image in defect.image_set.all():
+                        images_to_delete.append(image.image.name)
 
-            query_set = ", ".join(map(lambda x: x['name'], list(to_delete.values())))
-            messages.info(request, "Usunięto następujące usterki: " + query_set)
-            to_delete.delete()
+                query_set = ", ".join(map(lambda x: x['name'], list(to_delete.values())))
+                messages.info(request, "Usunięto następujące usterki: " + query_set)
+                to_delete.delete()
 
-            for image_name in images_to_delete:
-                image_path = '/zapisy/defect/' + image_name
-                if gd_storage.exists(image_path):
-                    gd_storage.delete(image_path)
+                for image_name in images_to_delete:
+                    image_path = '/zapisy/defect/' + image_name
+                    if gd_storage.exists(image_path):
+                        gd_storage.delete(image_path)
+            else:
+                messages.error(request,
+                               "Z tego poziomu usterka może zostać usunięta tylko przez osoby do tego wyznaczone")
         else:
             messages.error(request, "Nie wprowadzono metody. Ten błąd nie powinien się zdarzyć. Proszę o kontakt z "
                                     "administratorem systemu zapisów.")
     return render(request, "defectMain.html", {"defects": Defect.objects.all().select_related("reporter"),
                                                "visibleDefects": [parse_defect(defect) for defect in
-                                                                  Defect.objects.all().select_related("reporter")]})
+                                                                  Defect.objects.all().select_related("reporter")],
+                                               'is_repairer': is_repairer_val})
 
 
 def parse_names(request):
@@ -77,7 +87,8 @@ def show_defect(request, defect_id):
 
         info_form = InformationFromRepairerForm(instance=defect)
 
-        return render(request, 'showDefect.html', {'defect': defect, 'image_urls': image_urls, 'info_form': info_form})
+        return render(request, 'showDefect.html', {'defect': defect, 'image_urls': image_urls, 'info_form': info_form,
+                                                   'is_repairer': is_repairer(request.user.id)})
     except Defect.DoesNotExist:
         messages.error(request, "Nie istnieje usterka o podanym id.")
         return redirect('defects:main')
@@ -165,7 +176,7 @@ def add_defect_post_request(request):
     form_data = form.cleaned_data
     defect = Defect(name=form_data['name'], creation_date=creation_date, last_modification=creation_date,
                     place=form_data['place'], description=form_data['description'], reporter=request.user,
-                    state=form_data['state'])
+                    state=0)
 
     formset = DefectImageFormSet(request.POST, request.FILES, instance=defect)
     if not formset.is_valid():
@@ -210,6 +221,10 @@ def delete_image(request, image_id):
 
 def post_information_from_repairer(request, defect_id):
     if request.method == "POST":
+        if not is_repairer(request.user.id):
+            messages.error(request, "Informacja od serwisanta"
+                                    " może zostać wypełniona tylko przez osoby do tego wyznaczone.")
+            return redirect('defects:show_defect', defect_id=defect_id)
         info_form = InformationFromRepairerForm(request.POST)
         if not info_form.is_valid():
             messages.error(request, info_form.errors)
@@ -229,3 +244,7 @@ def post_information_from_repairer(request, defect_id):
         messages.success(request, "Pomyślnie zmieniono informację od serwisanta")
         return redirect('defects:show_defect', defect_id=defect_id)
     raise Http404
+
+
+def is_repairer(user_id):
+    return DefectMaintainer.objects.filter(user_id=user_id).exists()

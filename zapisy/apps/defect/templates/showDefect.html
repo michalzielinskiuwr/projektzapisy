@@ -91,13 +91,15 @@
                 <p>Nie ma jeszcze żadnej informacji od serwisanta</p>
             {% endif %}
         </div>
-        <button class="btn btn-info" type="button" id="show-info-form-button">
-            {% if defect.information_from_repairer %}
-                Edytuj
-            {% else %}
-                Dodaj
-            {% endif %}
-        </button>
+        {% if is_repairer %}
+            <button class="btn btn-info" type="button" id="show-info-form-button">
+                {% if defect.information_from_repairer %}
+                    Edytuj
+                {% else %}
+                    Dodaj
+                {% endif %}
+            </button>
+        {% endif %}
     </div>
 
     <div id="info-form-div" class="d-none">
