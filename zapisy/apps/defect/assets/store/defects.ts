@@ -1,22 +1,6 @@
 import { values, sortBy } from "lodash";
 import { ActionContext } from "vuex";
-
-export interface DefectInfo {
-  id: number;
-  name: string;
-  creation_date: string;
-  last_modification: string;
-  place: string;
-  state: PossibleStates;
-  selected: boolean;
-  status_color: string;
-}
-
-export type PossibleStates =
-  | "Zgłoszone"
-  | "Nie da się"
-  | "Dłuższy problem"
-  | "Zrobione";
+import { DefectInfo } from "@/defect/assets/models";
 
 interface State {
   defects: DefectInfo[];

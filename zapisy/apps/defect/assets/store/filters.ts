@@ -1,6 +1,6 @@
 import { every, invokeMap, values } from "lodash";
+import {DefectInfo} from "@/defect/assets/models";
 
-import { DefectInfo } from "./defects";
 
 export interface Filter {
   visible(c: DefectInfo): boolean;

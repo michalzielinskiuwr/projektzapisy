@@ -1,6 +1,6 @@
 import { property } from "lodash";
+import {DefectInfo} from "@/defect/assets/models";
 
-import { DefectInfo } from "./defects";
 
 interface State {
   property: string;

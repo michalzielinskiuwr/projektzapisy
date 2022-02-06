@@ -55,7 +55,7 @@ DefectImageFormSet = inlineformset_factory(Defect,
 class InformationFromRepairerForm(forms.ModelForm):
     class Meta:
         model = Defect
-        fields = ['information_from_repairer']
+        fields = ['information_from_repairer', 'state']
 
     def __init__(self, *args, **kwargs):
         super(InformationFromRepairerForm, self).__init__(*args, **kwargs)
