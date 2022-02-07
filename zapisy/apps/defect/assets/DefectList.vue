@@ -1,7 +1,7 @@
 <script lang="ts">
 import Vue from "vue";
 import { mapGetters } from "vuex";
-import {DefectInfo} from "@/defect/assets/models";
+import { DefectInfo } from "@/defect/assets/models";
 import SorterField from "@/theses/assets/components/sorters/SorterField.vue";
 import Component from "vue-class-component";
 
