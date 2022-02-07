@@ -1,6 +1,5 @@
-import { property } from "lodash";
-
-import { DefectInfo } from "./defects";
+import { property } from "lodash";\
+import { DefectInfo } from "@/defect/assets/models";
 
 interface State {
   property: string;
@@ -14,7 +13,6 @@ const state: State = {
 const getters = {
   // compare compares two defects based on current sorter
   compare: (state: State) => (a: DefectInfo, b: DefectInfo) => {
-    alert(state.property);
     if (state.property == "modified") state.property = "last_modification";
     let propGetter = property(state.property) as (c: DefectInfo) => string;
     return state.order

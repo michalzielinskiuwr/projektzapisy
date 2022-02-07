@@ -39,7 +39,6 @@ mapping = {
     'W pracy dyplomowej "{title}" pojawiła się możliwość głosowania.',
     NotificationType.DEFECT_MODIFIED:
     'Zgłoszona przez Ciebie usterka o nazwie "{defect_name}" została zmodyfikowana.',
-}
 
 mapping_title = {
     NotificationType.NOT_PULLED_FROM_QUEUE:

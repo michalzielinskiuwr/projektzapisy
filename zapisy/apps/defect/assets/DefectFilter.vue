@@ -17,9 +17,9 @@ export default Vue.extend({
     return {
       allStates: {
         0: "Zgłoszone",
-        1: "Nie da się",
-        2: "Dłuższy problem",
-        3: "Zrobione",
+        1: "W realizacji",
+        2: "W oczekiwaniu na realizację",
+        3: "Zakończone",
       },
     };
   },
