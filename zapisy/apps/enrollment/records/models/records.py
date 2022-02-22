@@ -243,7 +243,7 @@ class Record(models.Model):
                     break
         ret = defaultdict(lambda: defaultdict(int))
         for w in wt:
-            ret[w['group__id']][w['group__type']] += 1
+            ret[w['group__course']][w['group__type']] += 1
         return ret
 
     @classmethod
