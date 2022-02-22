@@ -2,7 +2,6 @@
 
 Record Lifetime:
 
-
   The record's status transitions in one direction: QUEUED -> ENROLLED ->
   REMOVED. The ENROLLED phase may be skipped if the student removes his record
   while he is in the queue, or if the enrollment is unsuccessful. The REMOVED
