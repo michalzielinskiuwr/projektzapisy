@@ -41,10 +41,9 @@ def groups(request):
                 enrolled=enrolled_agg).annotate(queued=queued_agg).annotate(pinned=pinned_agg)
     waiting_students = Record.list_waiting_students(
         CourseInstance.objects.filter(semester=semester))
-    i=0
+    i = 0
     return render(request, 'statistics/groups_list.html', {
         'groups': groups,
         'waiting_students': waiting_students,
-        'i' : i,
+        'i':i,
     })
-

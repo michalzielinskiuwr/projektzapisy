@@ -12,7 +12,7 @@ from apps.users.models import Student
 @student_required
 @require_POST
 def enqueue(request):
-    """Puts the student into the group  queue."""
+    """Puts the student into the group queue."""
     student: Student = request.user.student
     group: Group = None
     try:
