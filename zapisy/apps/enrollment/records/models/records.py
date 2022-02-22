@@ -222,7 +222,7 @@ class Record(models.Model):
         queued = Record.objects.filter(
             status=RecordStatus.QUEUED, group__course__in=courses).values(
                 'group__course', 'group__type', 'student__user',
-                'student__user__first_name', 'student__user__last_name')   
+                'student__user__first_name', 'student__user__last_name')
         to_combine = Record.objects.filter(
             status=RecordStatus.QUEUED, group__course__in=courses).values(
                 'group__course', 'group__id', 'group__type', 'student__user',
@@ -234,9 +234,9 @@ class Record(models.Model):
         waiting = queued.difference(enrolled)
         wt = []
         for query in waiting:
-        	for query_all in to_combine:
-        		if ( (query['group__course']==query_all['group__course']) and (query['group__course']==query_all['group__course']) and (query['group__type']==query_all['group__type']) and (query['student__user']==query_all['student__user']) and (query['student__user__first_name']==query_all['student__user__first_name']) and (query['student__user__last_name']==query_all['student__user__last_name'])):
-                               wt.append(query_all)
+                for query_all in to_combine:
+                       if ( (query['group__course']==query_all['group__course']) and (query['group__course']==query_all['group__course']) and (query['group__type']==query_all['group__type']) and (query['student__user']==query_all['student__user']) and (query['student__user__first_name']==query_all['student__user__first_name']) and (query['student__user__last_name']==query_all['student__user__last_name'])):
+                       wt.append(query_all)
                                break
         ret = defaultdict(lambda: defaultdict(int))
         for w in wt:
@@ -605,4 +605,3 @@ class Record(models.Model):
             student_pulled.send_robust(
                 sender=self.__class__, instance=self.group, user=self.student.user)
             return other_groups_query_list
-
