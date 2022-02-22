@@ -123,9 +123,11 @@ input:checked + .slider:before {
                         <td>{{ group.queued }}</td>
                         
                      <td>
-                        {% with waiting_course=waiting_students|lookup:group.id %}
-                            {% for course_type in waiting_course %}
+                        {% with waiting_course=waiting_students|lookup:course.id %}
+                            {% for course_type in waiting_course reversed %}
+                            {% if forloop.first %}
                                         {{ waiting_course|lookup:course_type }}
+                            {% endif %}
                             {% endfor %}
                         {% endwith %}
                     </td>
