@@ -221,16 +221,13 @@ class Record(models.Model):
         """
         queued = Record.objects.filter(
             status=RecordStatus.QUEUED, group__course__in=courses).values(
-                'group__course', 'group__type', 'student__user',
-                'student__user__first_name', 'student__user__last_name')   
+                'group__course', 'group__type', 'student__user', 'student__user__first_name', 'student__user__last_name')   
         to_combine = Record.objects.filter(
             status=RecordStatus.QUEUED, group__course__in=courses).values(
-                'group__course', 'group__id', 'group__type', 'student__user',
-                'student__user__first_name', 'student__user__last_name')
+                'group__course', 'group__id', 'group__type', 'student__user', 'student__user__first_name', 'student__user__last_name')
         enrolled = Record.objects.filter(
             status=RecordStatus.ENROLLED, group__course__in=courses).values(
-                'group__course', 'group__type', 'student__user', 'student__user__first_name',
-                'student__user__last_name')
+                'group__course', 'group__type', 'student__user', 'student__user__first_name', 'student__user__last_name')
         waiting = queued.difference(enrolled)
         wt = []   
         for query in waiting:
