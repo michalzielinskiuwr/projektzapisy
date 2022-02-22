@@ -220,7 +220,7 @@ class Record(models.Model):
             group_type to a number of waiting students.
         """
         queued = Record.objects.filter(
-            status=RecordStatus.QUEUED, group__course__in=courses).values(
+            status=RecordStatus.QUEUED, group__course__in=courses).values(jakiejś
                 'group__course', 'group__type', 'student__user',
                 'student__user__first_name', 'student__user__last_name')
         enrolled = Record.objects.filter(
