@@ -236,7 +236,6 @@ class Record(models.Model):
         for query in waiting:
             for query_all in to_combine:
                 if ((query['group__course'] == query_all['group__course'])
-                    and (query['group__course'] == query_all['group__course'])
                     and (query['group__type'] == query_all['group__type'])
                     and (query['student__user'] == query_all['student__user'])
                     and (query['student__user__first_name'] == query_all['student__user__first_name'])):
@@ -250,14 +249,14 @@ class Record(models.Model):
     @classmethod
     def is_enrolled(cls, student: Student, group: Group) -> bool:
         """Checks if the student is already enrolled into the group."""
-        records=cls.objects.filter(
-            student=student, group = group, status = RecordStatus.ENROLLED)
+        records = cls.objects.filter(
+            student=student, group=group, status=RecordStatus.ENROLLED)
         return records.exists()
 
     @classmethod
     def is_recorded(cls, student: Student, group: Group) -> bool:
         """Checks if the student is already enrolled or enqueued into the group."""
-        entry=cls.is_recorded_in_groups(student, [group])[0]
+        entry = cls.is_recorded_in_groups(student, [group])[0]
         return getattr(entry, 'is_enqueued', False) or getattr(entry, 'is_enrolled', False)
 
     @classmethod
