@@ -45,5 +45,5 @@ def groups(request):
     return render(request, 'statistics/groups_list.html', {
         'groups': groups,
         'waiting_students': waiting_students,
-        'i':i,
+        'i': i,
     })
