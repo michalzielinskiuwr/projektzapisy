@@ -20,6 +20,11 @@
         <a class="nav-link {% block statistics-students-active %}{% endblock %}"
            href="{% url 'statistics:students' %}">Studenci</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link {% block statistics-overloads-active %}{% endblock %}"
+           href="{% url 'statistics:overloads' %}">Przeciążenia</a>
+    </li>
+    
 </ul>
 <div class="tab-content p-3 border-left border-right">
     {% block statistics-content %}{% endblock %}

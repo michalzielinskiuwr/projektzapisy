@@ -37,6 +37,15 @@ const AssetDefs = {
     path.resolve("apps/enrollment/timetable/assets/prototype-legend.scss"),
   ],
 
+  // Records app
+
+  "records-sorttable-component": [
+    path.resolve("apps/enrollment/records/assets/sorttable.js"),
+  ],
+   "records-filter-component": [
+    path.resolve("apps/enrollment/records/assets/filter.js"),
+  ],
+
   // Poll app
 
   "poll-bokeh-plotting": [path.resolve("apps/grade/poll/assets/bokeh.js")],
