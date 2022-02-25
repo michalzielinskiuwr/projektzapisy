@@ -42,7 +42,7 @@ const AssetDefs = {
   "records-sorttable-component": [
     path.resolve("apps/enrollment/records/assets/sorttable.js"),
   ],
-   "records-filter-component": [
+  "records-filter-component": [
     path.resolve("apps/enrollment/records/assets/filter.js"),
   ],
 
