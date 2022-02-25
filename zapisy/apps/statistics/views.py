@@ -24,6 +24,27 @@ def students(request):
         'students': students,
     })
 
+@permission_required('courses.view_stats')
+def overloads(request):
+    semester = Semester.get_upcoming_semester()
+    enrolled_agg = models.Count(
+        'record', filter=models.Q(record__status=RecordStatus.ENROLLED), distinct=True)
+    queued_agg = models.Count(
+        'record', filter=models.Q(record__status=RecordStatus.QUEUED), distinct=True)
+    pinned_agg = models.Count('pin', distinct=True)
+
+    groups = Group.objects.filter(course__semester=semester).select_related(
+        'course', 'teacher', 'teacher__user').order_by('course', 'type').only(
+            'course__name', 'teacher__user__first_name', 'teacher__user__last_name', 'limit',
+            'type').prefetch_related('guaranteed_spots', 'guaranteed_spots__role').annotate(
+                enrolled=enrolled_agg).annotate(queued=queued_agg).annotate(pinned=pinned_agg)
+    waiting_students = Record.list_waiting_students(
+        CourseInstance.objects.filter(semester=semester))
+    return render(request, 'statistics/overloads_list.html', {
+        'groups': groups,
+        'waiting_students': waiting_students,
+    })
+
 
 @permission_required('courses.view_stats')
 def groups(request):

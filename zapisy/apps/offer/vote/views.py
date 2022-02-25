@@ -1,11 +1,7 @@
-import json
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import models
 from django.shortcuts import get_object_or_404, redirect, render
-
-from django.urls import reverse
 
 from apps.enrollment.courses.models import Semester
 from apps.enrollment.utils import mailto
@@ -44,28 +40,7 @@ def vote(request):
         template_name = 'vote/form.html'
     elif system_state.correction_active_semester():
         template_name = 'vote/form_correction.html'
-
-    proposal = None
-    filter_statuses = [ProposalStatus.IN_OFFER, ProposalStatus.IN_VOTE, ProposalStatus.WITHDRAWN]
-    qs = Proposal.objects.filter(status__in=filter_statuses).order_by('name')
-    proposal_list = []
-    for p in qs.prefetch_related('effects', 'tags'):
-        proposal_dict = p.__json__()
-        proposal_dict.update({
-            'status': ProposalStatus(p.status)._name_,
-            'semester': p.semester,
-            'url': reverse('offer-page', args=(p.slug,)),
-        })
-        proposal_list.append(proposal_dict)
-    filter_data = Proposal.prepare_filter_data(qs)
-
-    return render(request, template_name, {
-        'formset': formset,
-        "proposal": proposal,
-        "filters_json": json.dumps(filter_data),
-
-        "proposals": json.dumps(proposal_list),
-    })
+    return render(request, template_name, {'formset': formset})
 
 
 @login_required

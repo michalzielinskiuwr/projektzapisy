@@ -3,47 +3,39 @@
 {% load filters %}
 {% load course_types %}
 
-{% block statistics-groups-active %}active{% endblock %}
+{% block statistics-overloads-active %}active{% endblock %}
 
 {% block statistics-content %}
+{% load render_bundle from webpack_loader %}
+
+{% render_bundle 'records-sorttable-component' %}
+
 <div class="table-responsive">
 
     {% regroup groups by course as courses_list %}
 
-    <table class="table table-striped">
+    <table id="mytab" class="table table-striped sortable">
         <thead class="text-muted">
             <tr>
+            	<th scope="col">Przedmiot</th>
                 <th scope="col">Prowadzący</th>
                 <th scope="col">Typ</th>
                 <th scope="col">Miejsca</th>
                 <th scope="col">Zapisani</th>
                 <th scope="col">Kolejka</th>
+                <th scope="col">Niezapisani</th>
                 <th scope="col">Przypięci</th>
                 <th></th>
             </tr>
         </thead>
         <tbody>
             {% for course, groups in courses_list %}
-                <tr>
-                    <th colspan="2">
-                        {{ course.name }}
-                    </th>
-                    <td colspan="6">
-                        {% with waiting_course=waiting_students|lookup:course.id %}
-                            {% for course_type in waiting_course %}
-                                <span class="badge badge-danger" title="Oczekujących w kolejkach">
-                                    {{ course_type|decode_class_type_plural }}
-                                    <span class="badge badge-light">
-                                        {{ waiting_course|lookup:course_type }}
-                                    </span>
-                                </span>
-                            {% endfor %}
-                        {% endwith %}
-                    </td>
-                </tr>
+            
+ 
                 {% for group in groups %}
-                    <tr>
-                        <td>{{ group.teacher }}</td>
+                <tr id='result_tr'>
+                        <td> {{ course.name }} </td>                   
+                        <td>{{group.teacher}}</td>
                         <td>{{ group.get_type_display }}</td>
                         <td>
                             {{ group.limit }}
@@ -56,6 +48,17 @@
                         </td>
                         <td>{{ group.enrolled }}</td>
                         <td>{{ group.queued }}</td>
+                        
+                     <td>
+                        {% with waiting_course=waiting_students|lookup:course.id %}
+                            {% for course_type in waiting_course reversed %}
+                            {% if forloop.first %}
+                                        {{ waiting_course|lookup:course_type}}
+                            {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </td>
+                                              
                         <td>{{ group.pinned }}</td>
                         <td>
                             <a class="badge badge-sm badge-primary"
@@ -65,9 +68,14 @@
                             </a>
                         </td>
                     </tr>
+           
                 {% endfor %}
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+{% render_bundle 'records-filter-component' %}
+
 {% endblock %}
+

@@ -228,8 +228,17 @@ class Record(models.Model):
                 'group__course', 'group__type', 'student__user', 'student__user__first_name',
                 'student__user__last_name')
         waiting = queued.difference(enrolled)
+        wt = []
+        for query in waiting:
+            for query_all in queued:
+                if ((query['group__course'] == query_all['group__course'])
+                    and (query['group__type'] == query_all['group__type'])
+                    and (query['student__user'] == query_all['student__user'])
+                        and (query['student__user__first_name'] == query_all['student__user__first_name'])):
+                    wt.append(query_all)
+                    break
         ret = defaultdict(lambda: defaultdict(int))
-        for w in waiting:
+        for w in wt:
             ret[w['group__course']][w['group__type']] += 1
         return ret
 

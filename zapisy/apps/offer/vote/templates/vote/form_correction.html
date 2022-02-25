@@ -15,13 +15,6 @@
 
 {% block all-content %}
 
-{% block top-content %}
-<script id="courses-data" type="application/json">{{ proposals|safe }}</script>
-<script id="filters-data" type="application/json">{{ filters_json|safe }}</script>
-{% endblock %}
-
-<div id="course-filter"></div>
-
 {# This will be used by Vue component to display currently used points #}
 <div id="point-counter">{{ formset.limit }}</div>
 
@@ -37,14 +30,12 @@
             {% for form in formset.forms %}
                 <tr
                         {% if not form.instance.proposal.course_type.free_in_vote %}
-                            class="limit subject-id-{{form.instance.proposal.id}}"
-                        {% else %}
-                                class="subject-id-{{form.instance.proposal.id}}"
+                            class="limit"
                         {% endif %}
                 >
                     <th scope="row">
                         {{ form.instance.proposal.name }}
-                        <a href="{% url 'offer-page' form.instance.proposal.slug  %}"
+                        <a href="{% url 'offer-page' form.instance.proposal.slug  %}" 
                                 class="mx-2 font-weight-light" target="new"
                                 title="Otwórz w nowym oknie">
                             <i class="fa fa-sm fa-external-link-alt"></i>
@@ -65,8 +56,6 @@
     <button type="submit" class="btn btn-primary">Głosuj</button>
 </form>
 
-{% endblock all-content %}
+{% render_bundle "vote-point-counter" %}
 
-{% block rendered_bundles %}
-    {% render_bundle "vote-point-counter" %}
-{% endblock %}
+{% endblock all-content %}

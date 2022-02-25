@@ -2,18 +2,10 @@
 // takes care of highlighting rows where the vote has been given out.
 
 import Vue from "vue";
-import Vuex from "vuex";
-
 import CounterComponent from "./components/CounterComponent.vue";
-import FilterComponent from "./components/CourseFilter.vue";
-
-import filters from "@/enrollment/timetable/assets/store/filters";
 
 // comp will hold a Vue component.
-let counterComponent: CounterComponent | null = null;
-
-var coursesDataStr: string;
-var coursesDataArray: Array<object>;
+let comp: CounterComponent | null = null;
 
 // Given a name-value map and an input DOM element updates the value
 // corresponding to the input.
@@ -46,22 +38,6 @@ function highlightVotedRow(select: HTMLSelectElement) {
   }
 }
 
-function setUpFilters() {
-  Vue.use(Vuex);
-
-  const store = new Vuex.Store({
-    modules: {
-      filters,
-    },
-  });
-
-  new Vue({
-    el: "#course-filter",
-    render: (h) => h(FilterComponent, { props: { refreshFun: applyFilters } }),
-    store,
-  });
-}
-
 function setUpCounter() {
   const limit = parseInt(
     document.getElementById("point-counter")!.innerHTML,
@@ -75,7 +51,7 @@ function setUpCounter() {
     setValueMapFromInput(inputsMap, input as HTMLInputElement);
   }
 
-  counterComponent = new Vue({
+  comp = new Vue({
     el: "#point-counter",
     data: {
       inputs: inputsMap,
@@ -92,41 +68,11 @@ function setUpCounter() {
   });
 }
 
-function applyFilters(tester: any) {
-  const rows = document.querySelectorAll("tr");
-  const filtered: any = coursesDataArray.filter(tester);
-
-  for (const row of rows) {
-    let hideRow = true;
-    for (const courseIdx in filtered) {
-      if (row!.classList.contains("subject-id-" + filtered[courseIdx].id)) {
-        hideRow = false;
-        break;
-      }
-    }
-    if (hideRow) {
-      row!.classList.add("hidden");
-      row.setAttribute("style", "display: none;");
-    } else {
-      row!.classList.remove("hidden");
-      row.setAttribute("style", "");
-    }
-  }
-}
-
-function FormatCoursesData(coursesDataStr: string) {
-  return JSON.parse(coursesDataStr);
-}
-
 document.addEventListener("DOMContentLoaded", function () {
   // We set-up the counter component in the beginning.
   setUpCounter();
-  setUpFilters();
-  coursesDataStr = document.getElementById("courses-data")!.innerHTML;
-  coursesDataArray = FormatCoursesData(coursesDataStr);
 
-  const inputs = document.querySelectorAll(".select");
-
+  const inputs = document.querySelectorAll("select");
   // Highlight "voted for" proposals ones where the current value is not a
   // minimum option.
   for (const input of inputs) {
@@ -135,17 +81,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Whenever one of the inputs is changed, we need to update the value stored
   // in the component.
-
   for (const input of inputs) {
     (input as HTMLElement).addEventListener("input", function (_) {
       const row = this.closest("tr");
-
       if (row!.classList.contains("limit")) {
         // Update the map.
-        setValueMapFromInput(
-          counterComponent!.inputs,
-          this as HTMLInputElement
-        );
+        setValueMapFromInput(comp!.inputs, this as HTMLInputElement);
       }
 
       // If the value is different than minimum, add a highlight.
