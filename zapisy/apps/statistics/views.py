@@ -24,6 +24,7 @@ def students(request):
         'students': students,
     })
 
+
 @permission_required('courses.view_stats')
 def overloads(request):
     semester = Semester.get_upcoming_semester()
